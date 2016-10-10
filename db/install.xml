@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="repository/googledrive/db" VERSION="20161003" COMMENT="XMLDB file for Moodle repository/googledrive"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="repository_gdrive_tokens" COMMENT="Maintains Google drive tokens for each user that has connected their google account with this repository">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="user's id"/>
+        <FIELD NAME="refreshtokenid" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Refresh token aqcuired from Google offline api"/>
+        <FIELD NAME="gmail" TYPE="char" LENGTH="60" NOTNULL="false" DEFAULT="null" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="useridindex" UNIQUE="true" FIELDS="userid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
