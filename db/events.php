@@ -1,6 +1,6 @@
 <?php
 
-$callback = 'repository_googledrive::manage_resources';
+$callback = 'repository_googledrive_observer::manage_resources';
 
 $observers = array (
 

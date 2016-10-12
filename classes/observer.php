@@ -104,7 +104,7 @@ class repository_googledrive_observer {
     private static function get_resources($courseid, $contextinstanceid=null) {
         global $DB;
         $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
-        $id = $googledrive->id;
+        $id = $googledriverepo->id;
         if (empty($id)) {
             // We did not find any instance of googledrive.
             mtrace('Could not find any instance of the repository');
@@ -165,7 +165,7 @@ class repository_googledrive_observer {
     private static function get_google_drive_repo() {
         global $DB;
         $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
-        return new repository_googledrive($googledrivesrepo->id);
+        return new repository_googledrive($googledriverepo->id);
     }
 
 }
