@@ -1,0 +1,45 @@
+diff --git a/lib/behat/behat_base.php b/lib/behat/behat_base.php
+index 3c94cf8..7893c55 100644
+--- a/lib/behat/behat_base.php
++++ b/lib/behat/behat_base.php
+@@ -678,7 +678,7 @@ class behat_base extends Behat\MinkExtension\Context\RawMinkContext {
+             try {
+                 $jscode = '
+                     return function() {
+-                        if (typeof M === "undefined") {
++                        if (typeof M === "undefined" || typeof M.util === "undefined") {
+                             if (document.readyState === "complete") {
+                                 return "";
+                             } else {
+diff --git a/lib/google/curlio.php b/lib/google/curlio.php
+index 72e7d2f..ff3bc21 100644
+--- a/lib/google/curlio.php
++++ b/lib/google/curlio.php
+@@ -65,7 +65,13 @@ class moodle_google_curlio extends Google_IO_Curl {
+                 $ret = $curl->head($url);
+                 break;
+             case 'PUT':
+-                $ret = $curl->put($url);
++                $ret = $curl->put($url, $request->getPostBody());
++                break;
++            case 'PATCH':
++                $ret = $curl->put($url, $request->getPostBody());
++                break;
++            case 'DELETE':
++                $ret = $curl->delete($url, $request->getPostBody());
+                 break;
+             default:
+                 throw new coding_exception('Unknown request type: ' . $method);
+diff --git a/lib/google/src/Google/Service/Drive.php b/lib/google/src/Google/Service/Drive.php
+index e30a331..93c6f94 100644
+--- a/lib/google/src/Google/Service/Drive.php
++++ b/lib/google/src/Google/Service/Drive.php
+@@ -2116,7 +2116,7 @@ class Google_Service_Drive_Permissions_Resource extends Google_Service_Resource
+   {
+     $params = array('fileId' => $fileId, 'permissionId' => $permissionId);
+     $params = array_merge($params, $optParams);
+-    return $this->call('delete', array($params));
++    return $this->call('delete', array($params), "Google_Service_Drive_Permission");
+   }
+ 
+   /**
