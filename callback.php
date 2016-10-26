@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -30,7 +29,7 @@ require_once(dirname(dirname(dirname(__FILE__))).'/config.php');
 
 require_login();
 
-// call opener window to refresh repository
+// Call opener window to refresh repository
 // the callback url should be something like this:
 // http://xx.moodle.com/repository/repository_callback.php?repo_id=1&sid=xxx
 // sid is the attached auth token from external source
@@ -39,7 +38,7 @@ require_login();
 // manually.
 $strhttpsbug = get_string('cannotaccessparentwin', 'repository');
 $strrefreshnonjs = get_string('refreshnonjsfilepicker', 'repository');
-$js =<<<EOD
+$js = <<<EOD
 <html>
 <head>
     <script type="text/javascript">
