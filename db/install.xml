@@ -18,5 +18,20 @@
         <INDEX NAME="useridindex" UNIQUE="true" FIELDS="userid"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="repository_gdrive_references" COMMENT="Store course module ids and corresponding reference ids">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Course id"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Course module id"/>
+        <FIELD NAME="reference" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="File reference"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="courseidindex" UNIQUE="false" FIELDS="courseid"/>
+        <INDEX NAME="cmidindex" UNIQUE="true" FIELDS="cmid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

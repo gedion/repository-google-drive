@@ -18,7 +18,7 @@
  * Strings for component 'repository_googledrive', language 'en', branch 'MOODLE_20_STABLE'
  *
  * @package   repository_googledrive
- * @copyright 1999 onwards Martin Dougiamas  {@link http://moodle.com}
+ * @copyright 2016
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
@@ -43,4 +43,5 @@ $string['googledriveconnection'] = 'Sign in with your email';
 $string['googledriveconnection_help'] = 'Once you authorize us to see your Google Drive you\'ll be able to submit your assignments directly from Google Drive, and create and share documents with members of your classes.';
 $string['googleemail'] = 'Email address';
 $string['googleemail_help'] = 'The email address associated with your Google account.';
-
+$string['eventtokencreated'] = 'User token created';
+$string['eventtokendeleted'] = 'User token deleted';
