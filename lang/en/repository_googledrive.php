@@ -43,4 +43,3 @@ $string['googledriveconnection'] = 'Sign in with your email';
 $string['googledriveconnection_help'] = 'Once you authorize us to see your Google Drive you\'ll be able to submit your assignments directly from Google Drive, and create and share documents with members of your classes.';
 $string['googleemail'] = 'Email address';
 $string['googleemail_help'] = 'The email address associated with your Google account.';
-

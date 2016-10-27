@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
 /**
  * Google Drive repository data generator class
  *
@@ -23,6 +22,9 @@
  * @copyright  2016
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+
+defined('MOODLE_INTERNAL') || die();
+
 class repository_googledrive_generator extends testing_repository_generator {
 
     /**
@@ -41,5 +43,4 @@ class repository_googledrive_generator extends testing_repository_generator {
         }
         return $record;
     }
-
 }

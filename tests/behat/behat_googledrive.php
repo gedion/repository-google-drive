@@ -15,26 +15,25 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 // NOTE: no MOODLE_INTERNAL test here, this file may be required by behat before including /config.php.
-
 require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
 
 use Behat\Behat\Context\Step\Given as Given;
 use Behat\Gherkin\Node\TableNode as TableNode;
 use Behat\Mink\Exception\SkippedException as SkippedException;
 
-
 /**
  * Steps definitions to deal with the Google repository.
  *
- * @package    repository_googledrive
- * @category   test
- * @copyright  2016
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package repository_googledrive
+ * @category test
+ * @copyright 2016
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class behat_googledrive extends behat_base {
-
+class behat_googledrive extends behat_base
+{
     /**
      * Used to determine if we need to login to Google Drive again.
+     *
      * @var string
      */
     private static $googlerefreshtoken = null;
@@ -56,65 +55,69 @@ class behat_googledrive extends behat_base {
         $fromform['pluginname'] = 'googledrive';
         if (empty($fromform['clientid']) || empty($fromform['secret'])) {
             debugging('Googledrive clientid/secret not set in config');
-            throw new SkippedException;
+            throw new SkippedException();
         }
 
         $type = new repository_type('googledrive', $fromform, true);
-        if (!$typeid = $type->create()) {
+        if (! $typeid = $type->create()) {
             debugging('Cannot create Googledrive repo');
-            throw new SkippedException;
+            throw new SkippedException();
         }
     }
 
     /**
      * Create the gdoc files.
-     *
      */
     public function create_test_files() {
         error_log("create_test_files");
         global $USER;
         $context = context_user::instance($USER->id);
-        $repoinstances = repository::get_instances(array('currentcontext'=>$context, 'type'=>'googledrive'));
-        $googlerepoinstance =  array_values($repoinstances)[0];
-        $fileMetadata = new Google_Service_Drive_DriveFile(array(
-          'title' => 'My Document',
-          'mimeType' => 'application/vnd.google-apps.document'));
-        $file = $googlerepoinstance->service->files->create($fileMetadata);
+        $repoinstances = repository::get_instances(array(
+            'currentcontext' => $context,
+            'type' => 'googledrive'
+        ));
+        $googlerepoinstance = array_values($repoinstances)[0];
+        $filemetadata = new Google_Service_Drive_DriveFile(array(
+            'title' => 'My Document',
+            'mimeType' => 'application/vnd.google-apps.document'
+        ));
+        $file = $googlerepoinstance->service->files->create($filemetadata);
         error_log(json_encode($file));
-
     }
 
     /**
      * Save token.
      * @AfterScenario
-     *
      */
     public function tear_down() {
-       global $DB, $USER;
-       $googlerefreshtokens = $DB->get_record('repository_gdrive_tokens', array ('userid'=>$USER->id));
-       if($googlerefreshtokens && $googlerefreshtokens->refreshtokenid) {
-           self::$googlerefreshtoken = $googlerefreshtokens->refreshtokenid;
-       }
-       //$this->create_test_files();
-       return true;
+        global $DB, $USER;
+        $googlerefreshtokens = $DB->get_record('repository_gdrive_tokens', array(
+            'userid' => $USER->id
+        ));
+        if ($googlerefreshtokens && $googlerefreshtokens->refreshtokenid) {
+            self::$googlerefreshtoken = $googlerefreshtokens->refreshtokenid;
+        }
+        // $this->create_test_files();
+        return true;
     }
 
     /**
      * @Given /^I wait until allow button is available$/
+     *
      * @param int $sectionnumber
      * @return void
      */
     public function i_wait_until_allow_button_is_available() {
-
         $this->ensure_element_does_not_exist('.modal-dialog-buttons button[disabled]', 'css_element');
     }
+
     /**
-     *
      * @Given /^I rename window name$/
      */
-    public function I_rename_window_name() {
+    public function i_rename_window_name() {
         $this->getSession()->evaluateScript('window.name="behat_repo_auth"');
     }
+
     /**
      * Connect to Google Drive.
      *
@@ -128,18 +131,27 @@ class behat_googledrive extends behat_base {
         $config = get_config('googledrive');
         if (empty($config->behatuser) || empty($config->behatpassword)) {
             debugging('Googledrive behat user/password not set in config');
-            throw new SkippedException;
+            throw new SkippedException();
         }
 
         $login = new TableNode();
-        $login->addRow(array('email', $config->behatuser));
+        $login->addRow(array(
+            'email',
+            $config->behatuser
+        ));
         $password = new TableNode();
-        $password->addRow(array('Passwd', $config->behatpassword));
+        $password->addRow(array(
+            'Passwd',
+            $config->behatpassword
+        ));
 
         // If running other Behat tests in which user already logged into
-        // Google Drive before, then bypass the login process
+        // Google Drive before, then bypass the login process.
         if (self::$googlerefreshtoken) {
-            $DB->insert_record('repository_gdrive_tokens', array( 'userid' => $USER->id, 'refreshtokenid' => self::$googlerefreshtoken));
+            $DB->insert_record('repository_gdrive_tokens', array(
+                'userid' => $USER->id,
+                'refreshtokenid' => self::$googlerefreshtoken
+            ));
         } else {
             // Go through entire login process.
             return array(

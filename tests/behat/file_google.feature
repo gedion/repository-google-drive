@@ -46,4 +46,3 @@ Feature: Adding Google Drive as a link or shortcut in File resource.
       | MyWeight.xlsx                            | "50000" and "60000"      |
       | Screen Shot 2016-03-14 at 3.29.43 PM.png | "200000" and "300000"    |
       | crcaccounts.neocities.org_billstarr.pdf  | "60000" and "100000"     |
-

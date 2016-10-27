@@ -34,7 +34,7 @@ require_once($CFG->dirroot . '/repository/googledrive/lib.php');
  */
 define('GOOGLE_DRIVE_URL', 'https://drive.google.com');
 
-/** * Form to edit repository google cs initial details.
+/** Form to edit repository google drive initial details.
  *
  */
 class edit_repository_googledrive_form extends moodleform {
@@ -71,7 +71,7 @@ class edit_repository_googledrive_form extends moodleform {
     }
 
     /**
-     * returns google redirect url(which can be either
+     * Returns google redirect url(which can be either
      * a login to google url or a revoke token url) and
      * a login status
      */
@@ -79,13 +79,13 @@ class edit_repository_googledrive_form extends moodleform {
         global $DB, $USER;
 
         $context = context_user::instance($USER->id);
-        $repoinstances = repository::get_instances(array('currentcontext'=>$context, 'type'=>'googledrive'));
-        if(count($repoinstances) == 0) {
+        $repoinstances = repository::get_instances(array('currentcontext' => $context, 'type' => 'googledrive'));
+        if (count($repoinstances) == 0) {
             throw new repository_exception('servicenotenabled', 'repository_googledrive');
         }
-        $googlerepoinstance =  array_values($repoinstances)[0];
-        $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
-        $googlerefreshtoken = $DB->get_record('repository_gdrive_tokens', array ('userid'=>$USER->id));
+        $googlerepoinstance = array_values($repoinstances)[0];
+        $googledriverepo = $DB->get_record('repository', array ('type' => 'googledrive'));
+        $googlerefreshtoken = $DB->get_record('repository_gdrive_tokens', array ('userid' => $USER->id));
         $repooptions = array(
             'ajax' => false,
             'mimetypes' => array('.mp3')
@@ -107,6 +107,4 @@ class edit_repository_googledrive_form extends moodleform {
         }
         return array($redirecturl, $status, $email);
     }
-
 }
-
