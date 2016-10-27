@@ -17,45 +17,48 @@
 /**
  * Observer class containing methods monitoring various events.
  *
- * @package    tool_monitor
- * @copyright  2014 onwards Ankit Agarwal <ankit.agrr@gmail.com>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package tool_monitor
+ * @copyright 2014 onwards Ankit Agarwal <ankit.agrr@gmail.com>
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->dirroot . '/repository/googledrive/lib.php');
 
 /**
  * Observer class containing methods monitoring various events.
  *
- * @since      Moodle 3.0
- * @package    repository_googledrive
- * @copyright  2016 Gedion Woldeselassie <gedion@umn.edu>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @since Moodle 3.0
+ * @package repository_googledrive
+ * @copyright 2016 Gedion Woldeselassie <gedion@umn.edu>
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class repository_googledrive_observer {
+class repository_googledrive_observer
+{
 
     /**
      * Sync google resource permissions based on various events.
      *
-     * @param \core\event\* $event The event fired.
+     * @param \core\event\* $event
+     *            The event fired.
      */
     public static function manage_resources($event) {
         global $DB;
         $courseid = $event->courseid;
-        $course = $DB->get_record('course', array('id' => $courseid));
+        $course = $DB->get_record('course', array(
+            'id' => $courseid
+        ));
         $repo = self::get_google_drive_repo();
-        switch($event->eventname) {
+        switch ($event->eventname) {
             case '\core\event\course_updated':
                 $usersemails = self::get_google_authenticated_users($courseid);
-                $resources  = self::get_resources($courseid);
+                $resources = self::get_resources($courseid);
                 foreach ($resources as $fileid) {
-                    foreach($usersemails as $email) {
-                        if($course->visible == 1) {
-                                $repo->insert_permission($fileid, $email, 'user', 'reader');
+                    foreach ($usersemails as $email) {
+                        if ($course->visible == 1) {
+                            $repo->insert_permission($fileid, $email, 'user', 'reader');
                         } else {
-                                $permissionid = $repo->print_permission_id_for_email($email);
-                                $repo->remove_permission($fileid, $permissionid);
+                            $permissionid = $repo->print_permission_id_for_email($email);
+                            $repo->remove_permission($fileid, $permissionid);
                         }
                     }
                 }
@@ -64,22 +67,22 @@ class repository_googledrive_observer {
             case '\core\event\course_module_updated':
                 $fileid = self::get_resource_id($courseid, $event->contextinstanceid);
                 $usersemails = self::get_google_authenticated_users($courseid);
-                foreach($usersemails as $email) {
-                    if($course->visible == 1) {
+                foreach ($usersemails as $email) {
+                    if ($course->visible == 1) {
                         $repo->insert_permission($fileid, $email, 'user', 'reader');
                     }
                 }
                 break;
             case '\core\event\role_assigned':
                 $email = self::get_google_authenticated_users_email($event->relateduserid);
-                $resources  = self::get_resources($courseid);
+                $resources = self::get_resources($courseid);
                 foreach ($resources as $fileid) {
                     $repo->insert_permission($fileid, $email, 'user', 'reader');
                 }
                 break;
             case '\core\event\role_unassigned':
                 $email = self::get_google_authenticated_users_email($event->relateduserid);
-                $resources  = self::get_resources($courseid);
+                $resources = self::get_resources($courseid);
                 foreach ($resources as $fileid) {
                     self::remove_permission($repo, $fileid, $email);
                 }
@@ -87,7 +90,7 @@ class repository_googledrive_observer {
             case '\core\event\course_module_deleted':
                 $fileid = self::get_resource_id($courseid, $event->contextinstanceid);
                 $usersemails = self::get_google_authenticated_users($courseid);
-                foreach($usersemails as $email) {
+                foreach ($usersemails as $email) {
                     self::remove_permission($repo, $fileid, $email);
                 }
                 break;
@@ -100,10 +103,11 @@ class repository_googledrive_observer {
         $repo->remove_permission($fileid, $permissionid);
     }
 
-
-    private static function get_resources($courseid, $contextinstanceid=null) {
+    private static function get_resources($courseid, $contextinstanceid = null) {
         global $DB;
-        $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
+        $googledriverepo = $DB->get_record('repository', array(
+            'type' => 'googledrive'
+        ));
         $id = $googledriverepo->id;
         if (empty($id)) {
             // We did not find any instance of googledrive.
@@ -119,27 +123,33 @@ class repository_googledrive_observer {
                    AND f.referencefileid IS NOT NULL
                    AND NOT (f.component = :component
                             AND f.filearea = :filearea)";
-       $resources = array();
-       $filerecords = $DB->get_recordset_sql($sql, array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id));
-       foreach ($filerecords as $filerecord) {
-           $docid = $filerecord->reference;
-           list($context, $course, $cm) = get_context_info_array($filerecord->contextid);
-           if($course->id == $courseid && is_null($contextinstanceid) or
-              $course->id == $courseid && $cm->id == $contextinstanceid) {
-               $resources[] = $docid;
-           }
-       }
-       return $resources;
+        $resources = array();
+        $filerecords = $DB->get_recordset_sql($sql, array(
+            'component' => 'user',
+            'filearea' => 'draft',
+            'repoid' => $id
+        ));
+        foreach ($filerecords as $filerecord) {
+            $docid = $filerecord->reference;
+            list ($context, $course, $cm) = get_context_info_array($filerecord->contextid);
+            if ($course->id == $courseid && is_null($contextinstanceid)
+                or $course->id == $courseid && $cm->id == $contextinstanceid) {
+                $resources[] = $docid;
+            }
+        }
+        return $resources;
     }
 
     private static function get_resource_id($courseid, $contextinstanceid) {
-        $resources  = self::get_resources($courseid, $contextinstanceid);
+        $resources = self::get_resources($courseid, $contextinstanceid);
         return current($resources);
     }
 
     private static function get_google_authenticated_users_email($userid) {
         global $DB;
-        $googlerefreshtoken = $DB->get_record('repository_gdrive_tokens', array ('userid'=> $userid));
+        $googlerefreshtoken = $DB->get_record('repository_gdrive_tokens', array(
+            'userid' => $userid
+        ));
         return $googlerefreshtoken->gmail;
     }
 
@@ -154,9 +164,12 @@ class repository_googledrive_observer {
                   JOIN {enrol} eu1_e
                        ON (eu1_e.id = eu1_ue.enrolid AND eu1_e.courseid = :courseid)
                 WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid ";
-        $users = $DB->get_recordset_sql($sql, array('courseid' => $courseid, 'guestid' => '1'));
+        $users = $DB->get_recordset_sql($sql, array(
+            'courseid' => $courseid,
+            'guestid' => '1'
+        ));
         $usersarray = array();
-        foreach($users as $user) {
+        foreach ($users as $user) {
             $usersarray[] = $user->gmail;
         }
         return $usersarray;
@@ -164,8 +177,9 @@ class repository_googledrive_observer {
 
     private static function get_google_drive_repo() {
         global $DB;
-        $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
+        $googledriverepo = $DB->get_record('repository', array(
+            'type' => 'googledrive'
+        ));
         return new repository_googledrive($googledriverepo->id);
     }
-
 }
