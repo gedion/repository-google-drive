@@ -100,15 +100,6 @@ class behat_googledrive extends behat_base {
     }
 
     /**
-     * @Given /^I wait until allow button is available$/
-     * @param int $sectionnumber
-     * @return void
-     */
-    public function i_wait_until_allow_button_is_available() {
-
-        $this->ensure_element_does_not_exist('.modal-dialog-buttons button[disabled]', 'css_element');
-    }
-    /**
      *
      * @Given /^I rename window name$/
      */
@@ -151,8 +142,9 @@ class behat_googledrive extends behat_base {
                 new Given('I press "next"'),
                 new Given('I set the following fields to these values:', $password),
                 new Given('I press "Sign in"'),
-                new Given('I wait until allow button is available'),
-                new Given('I press "Allow"')
+                new Given('I wait "3" seconds'),
+                new Given('I press "Allow"'),
+                new Given('I wait "3" seconds')
             );
         }
     }

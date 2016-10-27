@@ -7,6 +7,7 @@ Feature: Adding Google Drive as a link or shortcut in File resource.
       | Course1   | c1        |
     And Google Drive repository is enabled
     And I log in as "admin"
+    And I navigate to "Navigation" node in "Site administration > Appearance"
     And I am on site homepage
     And I follow "Preferences" in the user menu
     And I connect to Google Drive
