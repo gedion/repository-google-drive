@@ -44,5 +44,4 @@ $observers = array (
         'eventname'   => '\core\event\role_unassigned',
         'callback'    => $callback
     )
-
 );
