@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
+defined('MOODLE_INTERNAL') || die();
+
 /**
  * @param int $oldversion the version we are upgrading from
  * @return bool result
@@ -33,7 +35,7 @@ function xmldb_repository_googledrive_upgrade($oldversion) {
         $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
         $table->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
         $table->add_field('reference', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
-        
+
         // Adding keys to table repository_gdrive_references.
         $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
 

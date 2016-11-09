@@ -33,6 +33,10 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
+        'eventname'   => '\core\event\course_restored',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\course_section_updated',
         'callback'    => $callback
     ),
@@ -57,6 +61,10 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
+        'eventname'   => '\core\event\role_capabilities_updated',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\group_deleted',
         'callback'    => $callback
     ),
@@ -73,15 +81,11 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
-        'eventname'   => '\core\event\grouping_updated',
+        'eventname'   => '\core\event\grouping_group_assigned',
         'callback'    => $callback
     ),
     array (
-        'eventname'   => '\repository_googledocs\event\repository_gdrive_tokens_created',
-        'callback'    => $callback
-    ),
-    array (
-        'eventname'   => '\repository_googledocs\event\repository_gdrive_tokens_deleted',
+        'eventname'   => '\core\event\grouping_group_unassigned',
         'callback'    => $callback
     ),
     array (
@@ -89,11 +93,23 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
+        'eventname'   => '\core\event\user_enrolment_updated',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\user_enrolment_deleted',
         'callback'    => $callback
     ),
     array (
-        'eventname'   => '\core\event\user_enrolment_updated',
+        'eventname'   => '\core\event\user_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\repository_googledrive\event\repository_gdrive_tokens_created',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\repository_googledrive\event\repository_gdrive_tokens_deleted',
         'callback'    => $callback
     )
 );

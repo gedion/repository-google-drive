@@ -96,6 +96,7 @@ class repository_gdrive_tokens_created extends \core\event\base {
      * @return user_created
      */
     public static function create_from_userid($userid) {
+        global $DB;
         $data = array(
             'objectid' => $userid,
             'relateduserid' => $userid,

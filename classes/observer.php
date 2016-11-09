@@ -41,9 +41,8 @@ class repository_googledrive_observer {
      */
     public static function manage_resources($event) {
         global $DB;
-        $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
+        $googledriverepo = $DB->get_record('repository', array ('type' => 'googledrive'));
         $repo = new repository_googledrive($googledriverepo->id);
         $repo->manage_resources($event);
     }
-
 }

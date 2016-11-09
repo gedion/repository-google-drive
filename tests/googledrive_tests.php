@@ -1,4 +1,18 @@
 <?php
+// This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 defined('MOODLE_INTERNAL') || die();
 global $CFG;
@@ -11,12 +25,10 @@ class test_repository_googledrive extends advanced_testcase {
 
     private function enable_google_drive_repository() {
         global $CFG, $DB;
-
         $type = $this->getDataGenerator()->create_repository_type('googledrive');
         $repo = $this->getDataGenerator()->create_repository('googledrive');
         set_config('clientid', 'clientid1', 'googledrive');
         set_config('secret', 'secret1', 'googledrive');
-
         if (!$repoid = $repo->id) {
             error_log('Cannot create Googledrive repo');
         }
@@ -57,7 +69,6 @@ class test_repository_googledrive extends advanced_testcase {
         $DB->insert_record('repository_gdrive_tokens', $userdata);
         $this->getDataGenerator()->enrol_user($user->id, $course->id, $roleids['student']);
         $users [] = $user;
-
         $user = $this->getDataGenerator()->create_user();
         $userdata->refreshtokenid = '4';
         $userdata->gmail = 'testuser5@gmail.com';
@@ -70,13 +81,12 @@ class test_repository_googledrive extends advanced_testcase {
 
     private function create_resources($contextid) {
         global $DB;
-        $googledriverepo = $DB->get_record('repository', array ('type'=>'googledrive'));
+        $googledriverepo = $DB->get_record('repository', array ('type' => 'googledrive'));
         $repoid = $googledriverepo->id;
         $refrecord = new stdClass();
         $refrecord->repositoryid = $repoid;
         $refrecord->reference = 'dummygooglefileid';
         $filesreferenceid = $DB->insert_record('files_reference', $refrecord);
-
         $filerecord = new stdClass();
         $filerecord->contextid = $contextid;
         $filerecord->component = 'mod_url';
@@ -88,26 +98,24 @@ class test_repository_googledrive extends advanced_testcase {
         $filerecord->filesize = 0;
         $filerecord->referencefileid = $filesreferenceid;
         $filerecord->timecreated = time();
-        $filerecord->timemodified= time();
+        $filerecord->timemodified = time();
         $DB->insert_record('files', $filerecord);
     }
 
     /**
-      * Sets a protected property on a given object via reflection
-      *
-      * @param $object - instance in which protected value is being modified
-      * @param $property - property on instance being modified
-      * @param $value - new value of the property being modified
-      *
-      * @return void
-      */
-    private function set_protected_property($object, $property, $value)
-    {
+     * Sets a protected property on a given object via reflection
+     *
+     * @param $object - instance in which protected value is being modified
+     * @param $property - property on instance being modified
+     * @param $value - new value of the property being modified
+     *
+     * @return void
+     */
+    private function set_protected_property($object, $property, $value) {
         $property = new ReflectionProperty('repository_googledrive', $property);
         $property->setAccessible(true);
         $property->setValue($object, $value);
     }
-
 
     private function get_googlelib_mock_permissions() {
         $mockgooglepermissions = $this->getMockBuilder('Permissions')->setMethods(
@@ -118,32 +126,30 @@ class test_repository_googledrive extends advanced_testcase {
         $mockgooglepermissions->method('insert')->willReturn(array());
         $mockgooglepermissions->method('getIdForEmail')->willReturn($mockgooglelibpermissionid);
         $mockgooglepermissions->method('get')->willReturn($mockgooglelibpermissionid);
-
         return $mockgooglepermissions;
     }
-    private function get_googledrive_mock_repo() {
 
+    private function get_googledrive_mock_repo() {
         $mockgoogleservice = $this->getMockBuilder('Service')->setMethods(array('setPermisssion'))->getMock();
         $mockgoogleservice->permissions = $this->get_googlelib_mock_permissions();
-
         $mockrepo = $this->getMockbuilder(
                 'repository_googledrive')->disableoriginalconstructor()->setmethods(
                 array('noop'))->getmock();
         $this->set_protected_property($mockrepo, 'service', $mockgoogleservice);
         return $mockrepo;
     }
+
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     */
     public function fire_googledrive_course_updated_event() {
         global $DB;
-
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $course->visible = 1;
         $this->create_google_user_and_enrol($course);
         $coursecontext = context_course::instance($course->id);
@@ -154,17 +160,18 @@ class test_repository_googledrive extends advanced_testcase {
         $mockrepo = $this->get_googledrive_mock_repo();
         $this->assertEquals(true, $mockrepo->manage_resources($events[12]));
     }
+
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_course_updated_hidden_event() {
         $this->resetAfterTest(true);
         $course = $this->getDataGenerator()->create_course();
         $sink = $this->redirectEvents();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $course->visible = 0;
         $this->create_google_user_and_enrol($course);
         $coursecontext = context_course::instance($course->id);
@@ -177,15 +184,15 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_role_assigned_event() {
         $this->resetAfterTest(true);
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $sink = $this->redirectEvents();
         $this->create_google_user_and_enrol($course);
         $coursecontext = context_course::instance($course->id);
@@ -197,27 +204,25 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_role_unassigned_event() {
         global $DB;
         $this->resetAfterTest(true);
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $sink = $this->redirectEvents();
         $users = $this->create_google_user_and_enrol($course);
         update_course($course);
         $events = $sink->get_events();
-
         $mockrepo = $this->get_googledrive_mock_repo();
-
         $mockrepo->manage_resources($events[8]);
         $coursecontext = context_course::instance($course->id);
         $this->create_resources($coursecontext->id);
-        $studentrole = $DB->get_record('role', array('shortname'=>'student'));
+        $studentrole = $DB->get_record('role', array('shortname' => 'student'));
         role_unassign($studentrole->id, $users[3]->id, context_course::instance($course->id)->id);
         $events = $sink->get_events();
         $sink->close();
@@ -225,18 +230,17 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_module_created_event() {
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('url', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -248,19 +252,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_module_updated_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('url', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -270,9 +273,9 @@ class test_repository_googledrive extends advanced_testcase {
         $formdata->display = 0;
         $formdata->externalurl = $drivemodule->externalurl;
         $formdata->coursemodule = $drivemodule->cmid;
-        $draftid_editor = 0;
-        file_prepare_draft_area($draftid_editor, null, null, null, null);
-        $formdata->introeditor = array('text' => 'This is a module', 'format' => FORMAT_HTML, 'itemid' => $draftid_editor);
+        $draftideditor = 0;
+        file_prepare_draft_area($draftideditor, null, null, null, null);
+        $formdata->introeditor = array('text' => 'This is a module', 'format' => FORMAT_HTML, 'itemid' => $draftideditor);
         update_module($formdata);
         $events = $sink->get_events();
         $sink->close();
@@ -281,19 +284,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_module_deleted_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -306,19 +308,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_course_category_updated_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -337,19 +338,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_course_content_deleted_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('url', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -363,19 +363,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_googledrive_course_section_updated_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -394,7 +393,6 @@ class test_repository_googledrive extends advanced_testcase {
         global $DB;
         $section = array_pop($sections);
         $section->name = 'Test section';
-
         $section->summary = 'Test section summary';
         $DB->update_record('course_sections', $section);
 
@@ -414,19 +412,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_repository_gdrive_tokens_created_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -460,19 +457,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_repository_gdrive_tokens_deleted_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -506,19 +502,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_user_enrolment_created_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -532,19 +527,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_user_enrolment_update_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);
@@ -561,19 +555,18 @@ class test_repository_googledrive extends advanced_testcase {
     }
 
     /**
-      * @test
-      * Sanity check test
-      * TO DO: refactor with better assertion
-      *
-      */
+     * @test
+     * Sanity check test
+     * TO DO: refactor with better assertion
+     *
+     */
     public function fire_user_enrolment_delete_event() {
         global $DB;
         $this->resetAfterTest(true);
         $sink = $this->redirectEvents();
         $course = $this->getDataGenerator()->create_course();
-        $repo_instance = $this->enable_google_drive_repository();
+        $repoinstance = $this->enable_google_drive_repository();
         $users = $this->create_google_user_and_enrol($course);
-
         $params = array('course' => $course->id, 'name' => 'Another url');
         $drivemodule = $this->getDataGenerator()->create_module('resource', $params);
         $modulecontext = context_module::instance($drivemodule->cmid);

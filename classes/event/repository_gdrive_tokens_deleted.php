@@ -80,16 +80,8 @@ class repository_gdrive_tokens_deleted extends \core\event\base {
 
         if (!isset($this->relateduserid)) {
             debugging('The \'relateduserid\' value must be specified in the event.', DEBUG_DEVELOPER);
-            $this->relateduserid = $this->objectid;
+            throw new \coding_exception('The \'relateduserid\' value must be specified in the event.');
         }
-
-        //if (!isset($this->other['refreshtokenid'])) {
-        //    throw new \coding_exception('The \'refreshtokenid\' value must be set in other.');
-        //}
-
-        //if (!isset($this->other['gmail'])) {
-        //    throw new \coding_exception('The \'gmail\' value must be set in other.');
-        //}
     }
 
     /**
@@ -101,12 +93,14 @@ class repository_gdrive_tokens_deleted extends \core\event\base {
      * @return user_created
      */
     public static function create_from_userid($userid) {
+        global $DB;
+        $id = $DB->get_record('repository_gdrive_tokens', array('userid' => $userid), 'id');
         $data = array(
-            'objectid' => $userid,
-            'relateduserid' => $userid,
-            'context' => \context_user::instance($userid)
+                'objectid' => $id->id,
+                'relateduserid' => $userid,
+                'context' => \context_user::instance($userid)
         );
-    
+
         // Create user_created event.
         $event = self::create($data);
         return $event;
