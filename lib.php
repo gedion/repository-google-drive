@@ -1173,6 +1173,10 @@ class repository_googledrive extends repository {
                 }
                 break;
             case '\core\event\user_deleted':
+                $userid = $event->relateduserid;
+                $token = $DB->get_record('repository_gdrive_tokens', array('userid' => $userid), 'refreshtokenid');
+                $this->client->revokeToken($token->refreshtokenid);
+                $DB->delete_records('repository_gdrive_tokens', array ('userid' => $userid));
                 break;
             case '\repository_googledrive\event\repository_gdrive_tokens_created':
                 break;
