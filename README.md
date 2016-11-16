@@ -92,7 +92,9 @@ BEHAT
 
 If you are interested in running the behat(somewhat hardcoded at the moment) tests, your config.php file will require the below settings. Message me and I will provide you with the values.   
 
-$CFG->forced_plugin_settings['googledrive']['clientid'] = '&lt;clientid&gt;' ;
-$CFG->forced_plugin_settings['googledrive']['secret'] = '&lt;secret&gt;';
-$CFG->forced_plugin_settings['googledrive']['behatuser'] = '&lt;gmailaccount&gt;';
-$CFG->forced_plugin_settings['googledrive']['behatpassword'] = '&lt;gmailpassword&gt;';
+```
+$CFG->forced_plugin_settings['googledrive']['clientid'] = '<clientid>' ;
+$CFG->forced_plugin_settings['googledrive']['secret'] = '<secret>';
+$CFG->forced_plugin_settings['googledrive']['behatuser'] = '<gmailaccount>';
+$CFG->forced_plugin_settings['googledrive']['behatpassword'] = '<gmailpassword>';
+```
