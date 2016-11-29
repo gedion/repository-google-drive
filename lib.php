@@ -1149,8 +1149,54 @@ class repository_googledrive extends repository {
             case '\core\event\grouping_deleted':
                 break;
             case '\core\event\grouping_group_assigned':
-                break;
             case '\core\event\grouping_group_unassigned':
+                $groupid = $event->other['groupid'];
+                $members = groups_get_members($groupid, 'userid');
+                $group = groups_get_group($groupid, 'courseid');
+                $courseid = $group->courseid;
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
+                $coursemodinfo = get_fast_modinfo($courseid, -1);
+                $cms = $coursemodinfo->get_cms();
+                $cmids = array();
+                foreach ($cms as $cm) {
+                    $cmids[] = $cm->id;
+                }
+                if ($course->visible == 1) {
+                    foreach ($cms as $cm) {
+                        $cmid = $cm->id;
+                        if ($cm->visible == 1) {
+                            rebuild_course_cache($courseid, true);
+                            foreach ($members as $member) {
+                                $userid = $member->userid;
+                                $email = $this->get_google_authenticated_users_email($userid);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $cminfo = $modinfo->get_cm($cmid);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                    $this->insert_cm_permission($cmid, $email);
+                                } else {
+                                    $this->remove_cm_permission($cmid, $email);
+                                }
+                            }
+                        } else {
+                            foreach ($members as $member) {
+                                $userid = $member->userid;
+                                $email = $this->get_google_authenticated_users_email($userid);
+                                $this->remove_cm_permission($cmid, $email);
+                            }
+                        }
+                    }
+                } else {
+                    foreach ($cmids as $cmid) {
+                        foreach ($members as $member) {
+                            $userid = $member->userid;
+                            $email = $this->get_google_authenticated_users_email($userid);
+                            $this->remove_cm_permission($cmid, $email);
+                        }
+                    }
+                }
                 break;
             case '\core\event\user_enrolment_created':
             case '\core\event\user_enrolment_updated':
