@@ -888,6 +888,7 @@ class repository_googledrive extends repository {
                 }
                 break;
             case '\core\event\course_updated':
+            case '\core\event\course_restored':
                 $courseid = $event->courseid;
                 $course = $DB->get_record('course', array('id' => $courseid), 'visible');
                 $coursecontext = context_course::instance($courseid);
@@ -942,8 +943,6 @@ class repository_googledrive extends repository {
                     }
                     $DB->delete_records('repository_gdrive_references', array('cmid' => $cm->cmid));
                 }
-                break;
-            case '\core\event\course_restored':
                 break;
             case '\core\event\course_section_updated':
                 $courseid = $event->courseid;
