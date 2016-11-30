@@ -773,7 +773,6 @@ class repository_googledrive extends repository {
             $role = $permission->getRole();
             if ($role != 'owner') {
                 $this->service->permissions->delete($fileid, $permissionid);
-                print("Successfully deleted the specified permission");
             }
         } catch (Exception $e) {
             debugging("Delete failed...");
