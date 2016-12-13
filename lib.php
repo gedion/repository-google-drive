@@ -1173,7 +1173,8 @@ class repository_googledrive extends repository {
                 if ($course->visible == 1) {
                     foreach ($cms as $cm) {
                         $cmid = $cm->id;
-                        if (!is_null($cmid)) {
+                        $gdrivecmid = $DB->get_record('repository_gdrive_references', array('cmid' => $cmid), 'cmid');
+                        if (!$gdrivecmid) {
                             return;
                         }
                         if ($cm->visible == 1) {
