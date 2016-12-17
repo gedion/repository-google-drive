@@ -500,7 +500,7 @@ class repository_googledrive extends repository {
      * @return int
      */
     public function supported_returntypes() {
-        return FILE_INTERNAL | FILE_EXTERNAL | FILE_REFERENCE;
+        return FILE_INTERNAL | FILE_REFERENCE;
     }
 
     /**
@@ -845,10 +845,10 @@ class repository_googledrive extends repository {
                     $cms = array();
                     $cmids = array();
                     foreach ($coursemods as $cm) {
-                        if ($cm->modname == 'resource') {
+                        //if ($cm->modname == 'resource') {
                             $cmids[] = $cm->id;
                             $cms[] = $cm;
-                        }
+                        //}
                     }
                     if ($course->visible == 1) {
                         foreach ($cms as $cm) {
@@ -1044,36 +1044,95 @@ class repository_googledrive extends repository {
                 $courseid = $event->courseid;
                 $course = $DB->get_record('course', array('id' => $courseid), 'visible');
                 $coursecontext = context_course::instance($courseid);
-                $userids = $this->get_google_authenticated_userids($courseid);
+                
                 $cmid = $event->contextinstanceid;
-                if ($course->visible == 1) {
-                    $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
-                    if ($cm->visible == 1) {
-                        rebuild_course_cache($courseid, true);
-                        foreach ($userids as $userid) {
-                            $email = $this->get_google_authenticated_users_email($userid);
-                            $modinfo = get_fast_modinfo($courseid, $userid);
-                            $sectionnumber = $this->get_cm_sectionnum($cmid);
-                            $secinfo = $modinfo->get_section_info($sectionnumber);
-                            $cminfo = $modinfo->get_cm($cmid);
-                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                $this->insert_cm_permission($cmid, $email);
-                            } else {
-                                $this->remove_cm_permission($cmid, $email);
-                            }
-                        }
+                $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
+                $cmcontext = context_module::instance($cmid);
+                
+                $insertusers = array();
+                $removeusers = array();
+                $userids = $this->get_google_authenticated_userids($courseid);
+                
+                $fileids = $this->get_fileids($cmid); 
+                
+                foreach ($userids as $userid) {
+                    $gmail = $this->get_google_authenticated_users_email($userid);
+                    if ($this->edit_capability($cmcontext, $userid)) {                        
+                        print $userid . " user can edit; ";
+                        $insertusers[$gmail] = 'writer';
                     } else {
-                        foreach ($userids as $userid) {
-                            $email = $this->get_google_authenticated_users_email($userid);
-                            $this->remove_cm_permission($cmid, $email);
+                        if ($course->visible == 1) {
+                            // Course is visible, continue checks
+                            if ($cm->visible == 1) {
+                                // Course module is visible, continue checks
+                                rebuild_course_cache($courseid, true);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                foreach ($userids as $userid) {
+                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    $cminfo = $modinfo->get_cm($cmid);
+                                    $gmail = $this->get_google_authenticated_users_email($userid);
+                        
+                                    // User can view course module, section, is enrolled in course, and cannot edit module
+                                    if ($cminfo->uservisible && $secinfo->uservisible && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
+                                        print $userid . " user can view; ";
+                                        $insertusers[$gmail] = 'reader';
+                                    } else {
+                                        // User cannot access course module, remove permissions
+                                        print $userid . " user can't view or edit; ";
+                                        $removeusers[] = $userid;
+                                    }
+                                }
+                            }
+                        } else {
+                            // Course not visible, remove view permissions
+                            $removeusers[] = $userid;
                         }
-                    }
-                } else {
-                    foreach ($userids as $userid) {
-                        $email = $this->get_google_authenticated_users_email($userid);
-                        $this->remove_cm_permission($cmid, $email);
                     }
                 }
+                
+                if (count($insertusers) > 0) {
+                    $this->batch_insert_permissions($fileids, $insertusers);
+                }
+                if (count($removeusers) > 0) {
+                    // $this->batch_remove_permissions
+                }
+                
+                // Old code
+                // Deal with file permissions.
+                //$courseid = $event->courseid;
+                //$course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                //$coursecontext = context_course::instance($courseid);
+                //$userids = $this->get_google_authenticated_userids($courseid);
+                //$cmid = $event->contextinstanceid;
+                //if ($course->visible == 1) {
+                //    $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
+                //    if ($cm->visible == 1) {
+                //        rebuild_course_cache($courseid, true);
+                //        foreach ($userids as $userid) {
+                //            $email = $this->get_google_authenticated_users_email($userid);
+                //            $modinfo = get_fast_modinfo($courseid, $userid);
+                //            $sectionnumber = $this->get_cm_sectionnum($cmid);
+                //            $secinfo = $modinfo->get_section_info($sectionnumber);
+                //            $cminfo = $modinfo->get_cm($cmid);
+                //            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                //                $this->insert_cm_permission($cmid, $email);
+                //            } else {
+                //                $this->remove_cm_permission($cmid, $email);
+                //            }
+                //        }
+                //    } else {
+                //        foreach ($userids as $userid) {
+                //            $email = $this->get_google_authenticated_users_email($userid);
+                //            $this->remove_cm_permission($cmid, $email);
+                //        }
+                //    }
+                //} else {
+                //    foreach ($userids as $userid) {
+                //        $email = $this->get_google_authenticated_users_email($userid);
+                //        $this->remove_cm_permission($cmid, $email);
+                //    }
+                //}
 
                 // Store cmid and reference.
                 $newdata = new stdClass();
@@ -1264,10 +1323,10 @@ class repository_googledrive extends repository {
                     $cms = array();
                     $cmids = array();
                     foreach ($coursemods as $cm) {
-                        if ($cm->modname == 'resource') {
+                        //if ($cm->modname == 'resource') {
                             $cmids[] = $cm->id;
                             $cms[] = $cm;
-                        }
+                        //}
                     }
                     if ($course->visible == 1) {
                         foreach ($cms as $cm) {
@@ -1336,11 +1395,10 @@ class repository_googledrive extends repository {
                 FROM {user} eu1_u
                 JOIN {repository_gdrive_tokens} grt
                 ON eu1_u.id = grt.userid
-                JOIN {user_enrolments} eu1_ue
-                ON eu1_ue.userid = eu1_u.id
+                
                 JOIN {enrol} eu1_e
-                ON (eu1_e.id = eu1_ue.enrolid AND eu1_e.courseid = :courseid)
-                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid AND eu1_ue.status = 0";
+                ON (eu1_e.courseid = :courseid)
+                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid";
         $users = $DB->get_recordset_sql($sql, array('courseid' => $courseid, 'guestid' => '1'));
         $usersarray = array();
         foreach ($users as $user) {
@@ -1419,25 +1477,105 @@ class repository_googledrive extends repository {
         }
 
         $sql = "SELECT DISTINCT r.reference
-            FROM {files_reference} r
-            LEFT JOIN {files} f
-            ON r.id = f.referencefileid
-            LEFT JOIN {context} c
-            ON f.contextid = c.id
-            LEFT JOIN {course_modules} cm
-            ON c.instanceid = cm.id
-            WHERE cm.id = :cmid
-            AND r.repositoryid = :repoid
-            AND f.referencefileid IS NOT NULL
-            AND not (f.component = :component and f.filearea = :filearea)";
+                FROM {files_reference} r
+                LEFT JOIN {files} f
+                ON r.id = f.referencefileid
+                LEFT JOIN {context} c
+                ON f.contextid = c.id
+                LEFT JOIN {course_modules} cm
+                ON c.instanceid = cm.id
+                WHERE cm.id = :cmid
+                AND r.repositoryid = :repoid
+                AND f.sortorder = 1
+                AND f.referencefileid IS NOT NULL
+                AND not (f.component = :component1 and f.component = :component2 and f.filearea = :filearea)";
 
         $filerecord = $DB->get_record_sql($sql,
-                    array('component' => 'user', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
+                    array('component1' => 'user', 'component2' => 'tool_recyclebin', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
 
         if ($filerecord) {
             return $filerecord->reference;
         } else {
             return false;
+        }
+    }
+    
+    private function get_fileids($cmid) {
+        global $DB;
+        $googledriverepo = $DB->get_record('repository', array ('type' => 'googledrive'), 'id');
+        $id = $googledriverepo->id;
+        if (empty($id)) {
+            // We did not find any instance of googledrive.
+            mtrace('Could not find any instance of the repository');
+            return;
+        }
+    
+        $sql = "SELECT DISTINCT r.reference
+                FROM {files_reference} r
+                LEFT JOIN {files} f
+                ON r.id = f.referencefileid
+                LEFT JOIN {context} c
+                ON f.contextid = c.id
+                LEFT JOIN {course_modules} cm
+                ON c.instanceid = cm.id
+                WHERE cm.id = :cmid
+                AND r.repositoryid = :repoid
+                AND f.referencefileid IS NOT NULL
+                AND NOT (f.component = :component1 AND f.component = :component2 AND f.filearea = :filearea)";
+    
+        $filerecords = $DB->get_records_sql($sql,
+                array('component1' => 'user', 'component2' => 'tool_recyclebin', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
+    
+        if ($filerecords) {
+            $fileids = array();
+            foreach ($filerecords as $filerecord) {
+                $fileids[] = $filerecord->reference;
+            }
+            return $fileids;
+        } else {
+            return false;
+        }
+    }
+    
+    // Currently only tests for mod/resource capabilities
+    private function edit_capability($context, $user) {
+        return has_capability('mod/resource:addinstance', $context, $user);
+    }
+    
+    // $users is associative array
+    private function batch_insert_permissions($fileids, $users) {
+        $type = 'user';
+        $optparams = array('sendNotificationEmails' => false);
+        $this->client->setUseBatch(true);
+        try {
+            $batch = $this->service->createBatch();
+            
+            foreach ($fileids as $fileid) {
+                foreach ($users as $gmail => $role) {
+                    $name = explode('@', $gmail);
+                    $newpermission = new Google_Service_Drive_Permission();
+                    $newpermission->setValue($gmail);
+                    $newpermission->setType($type);
+                    $newpermission->setRole($role);
+                    $newpermission->setEmailAddress($gmail);
+                    $newpermission->setDomain($name[1]);
+                    $newpermission->setName($name[0]);
+                    
+                    print "Insert for " . $gmail . " $role";
+                    $request = $this->service->permissions->insert($fileid, $newpermission, $optparams);
+                    $batch->add($request, $type);
+                } 
+            }
+            
+            $results = $batch->execute();
+            
+            foreach ($results as $result) {
+                if ($result instanceof Google_Service_Exception) {
+                    mtrace($result);
+                }
+            }
+        } finally {
+            $this->client->setUseBatch(false);
         }
     }
 

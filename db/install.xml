@@ -30,7 +30,7 @@
       </KEYS>
       <INDEXES>
         <INDEX NAME="courseidindex" UNIQUE="false" FIELDS="courseid"/>
-        <INDEX NAME="cmidindex" UNIQUE="true" FIELDS="cmid"/>
+        <INDEX NAME="cmidindex" UNIQUE="false" FIELDS="cmid"/>
       </INDEXES>
     </TABLE>
   </TABLES>
