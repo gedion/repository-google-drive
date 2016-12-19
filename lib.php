@@ -1050,89 +1050,67 @@ class repository_googledrive extends repository {
                 $cmcontext = context_module::instance($cmid);
                 
                 $insertusers = array();
-                $removeusers = array();
                 $userids = $this->get_google_authenticated_userids($courseid);
                 
-                $fileids = $this->get_fileids($cmid); 
+                $fileids = $this->get_fileids($cmid);
                 
-                foreach ($userids as $userid) {
-                    $gmail = $this->get_google_authenticated_users_email($userid);
-                    if ($this->edit_capability($cmcontext, $userid)) {                        
-                        print $userid . " user can edit; ";
-                        $insertusers[$gmail] = 'writer';
-                    } else {
-                        if ($course->visible == 1) {
-                            // Course is visible, continue checks
-                            if ($cm->visible == 1) {
-                                // Course module is visible, continue checks
-                                rebuild_course_cache($courseid, true);
-                                $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                foreach ($userids as $userid) {
-                                    $modinfo = get_fast_modinfo($courseid, $userid);
-                                    $secinfo = $modinfo->get_section_info($sectionnumber);
-                                    $cminfo = $modinfo->get_cm($cmid);
-                                    $gmail = $this->get_google_authenticated_users_email($userid);
-                        
-                                    // User can view course module, section, is enrolled in course, and cannot edit module
-                                    if ($cminfo->uservisible && $secinfo->uservisible && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
-                                        print $userid . " user can view; ";
-                                        $insertusers[$gmail] = 'reader';
-                                    } else {
-                                        // User cannot access course module, remove permissions
-                                        print $userid . " user can't view or edit; ";
-                                        $removeusers[] = $userid;
-                                    }
-                                }
+                $requests = array();
+                
+                foreach ($fileids as $fileid) {
+                    foreach ($userids as $userid) {
+                        $gmail = $this->get_google_authenticated_users_email($userid);
+                        if ($this->edit_capability($cmcontext, $userid)) {
+                            //$insertusers[$gmail] = 'writer';
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $call->role = 'writer';
+                            $requests[] = $call;
+                            if (count($requests) == 1000) {
+                                $this->batch_insert_permissions($requests);
+                                unset($requests);
+                                $requests = array();
                             }
                         } else {
-                            // Course not visible, remove view permissions
-                            $removeusers[] = $userid;
+                            if ($course->visible == 1) {
+                                // Course is visible, continue checks
+                                if ($cm->visible == 1) {
+                                    // Course module is visible, continue checks
+                                    rebuild_course_cache($courseid, true);
+                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                    foreach ($userids as $userid) {
+                                        $modinfo = get_fast_modinfo($courseid, $userid);
+                                        $secinfo = $modinfo->get_section_info($sectionnumber);
+                                        $cminfo = $modinfo->get_cm($cmid);
+                                        $gmail = $this->get_google_authenticated_users_email($userid);
+                    
+                                        // User can view course module, section, is enrolled in course, and cannot edit module
+                                        if ($cminfo->uservisible && $secinfo->uservisible && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
+                                            //$insertusers[$gmail] = 'reader';
+                                            $call = new stdClass();
+                                            $call->fileid = $fileid;
+                                            $call->gmail = $gmail;
+                                            $call->role = 'reader';
+                                            $requests[] = $call;
+                                            if (count($requests) == 1000) {
+                                                $this->batch_insert_permissions($requests);
+                                                unset($requests);
+                                                $requests = array();
+                                            }
+                                        }
+                                        // else user cannot access course module, do nothing
+                                    }
+                                }
+                                // else course module not visible, do nothing
+                            }
+                            // else course not visible, do nothing
                         }
                     }
                 }
-                
-                if (count($insertusers) > 0) {
-                    $this->batch_insert_permissions($fileids, $insertusers);
+
+                if (count($requests) > 0) {
+                    $this->batch_insert_permissions($requests);
                 }
-                if (count($removeusers) > 0) {
-                    // $this->batch_remove_permissions
-                }
-                
-                // Old code
-                // Deal with file permissions.
-                //$courseid = $event->courseid;
-                //$course = $DB->get_record('course', array('id' => $courseid), 'visible');
-                //$coursecontext = context_course::instance($courseid);
-                //$userids = $this->get_google_authenticated_userids($courseid);
-                //$cmid = $event->contextinstanceid;
-                //if ($course->visible == 1) {
-                //    $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
-                //    if ($cm->visible == 1) {
-                //        rebuild_course_cache($courseid, true);
-                //        foreach ($userids as $userid) {
-                //            $email = $this->get_google_authenticated_users_email($userid);
-                //            $modinfo = get_fast_modinfo($courseid, $userid);
-                //            $sectionnumber = $this->get_cm_sectionnum($cmid);
-                //            $secinfo = $modinfo->get_section_info($sectionnumber);
-                //            $cminfo = $modinfo->get_cm($cmid);
-                //            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                //                $this->insert_cm_permission($cmid, $email);
-                //            } else {
-                //                $this->remove_cm_permission($cmid, $email);
-                //            }
-                //        }
-                //    } else {
-                //        foreach ($userids as $userid) {
-                //            $email = $this->get_google_authenticated_users_email($userid);
-                //            $this->remove_cm_permission($cmid, $email);
-                //        }
-                //    }
-                //} else {
-                //    foreach ($userids as $userid) {
-                //        $email = $this->get_google_authenticated_users_email($userid);
-                //        $this->remove_cm_permission($cmid, $email);
-                //    }
-                //}
 
                 // Store cmid and reference.
                 $newdata = new stdClass();
@@ -1395,10 +1373,11 @@ class repository_googledrive extends repository {
                 FROM {user} eu1_u
                 JOIN {repository_gdrive_tokens} grt
                 ON eu1_u.id = grt.userid
-                
+                JOIN {user_enrolments} eu1_ue
+                ON eu1_ue.userid = eu1_u.id
                 JOIN {enrol} eu1_e
-                ON (eu1_e.courseid = :courseid)
-                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid";
+                ON (eu1_e.id = eu1_ue.enrolid AND eu1_e.courseid = :courseid)
+                WHERE eu1_u.deleted = 0 AND eu1_u.id <> :guestid AND eu1_ue.status = 0";
         $users = $DB->get_recordset_sql($sql, array('courseid' => $courseid, 'guestid' => '1'));
         $usersarray = array();
         foreach ($users as $user) {
@@ -1542,29 +1521,26 @@ class repository_googledrive extends repository {
         return has_capability('mod/resource:addinstance', $context, $user);
     }
     
-    // $users is associative array
-    private function batch_insert_permissions($fileids, $users) {
+    // Need to limit batches to 1000 calls - $requests should be checked before calling
+    private function batch_insert_permissions($requests) {
         $type = 'user';
         $optparams = array('sendNotificationEmails' => false);
         $this->client->setUseBatch(true);
         try {
             $batch = $this->service->createBatch();
             
-            foreach ($fileids as $fileid) {
-                foreach ($users as $gmail => $role) {
-                    $name = explode('@', $gmail);
-                    $newpermission = new Google_Service_Drive_Permission();
-                    $newpermission->setValue($gmail);
-                    $newpermission->setType($type);
-                    $newpermission->setRole($role);
-                    $newpermission->setEmailAddress($gmail);
-                    $newpermission->setDomain($name[1]);
-                    $newpermission->setName($name[0]);
-                    
-                    print "Insert for " . $gmail . " $role";
-                    $request = $this->service->permissions->insert($fileid, $newpermission, $optparams);
-                    $batch->add($request, $type);
-                } 
+            foreach ($requests as $request) {
+                $name = explode('@', $request->gmail);
+                $newpermission = new Google_Service_Drive_Permission();
+                $newpermission->setValue($request->gmail);
+                $newpermission->setType($type);
+                $newpermission->setRole($request->role);
+                $newpermission->setEmailAddress($request->gmail);
+                $newpermission->setDomain($name[1]);
+                $newpermission->setName($name[0]);
+                
+                $request = $this->service->permissions->insert($request->fileid, $newpermission, $optparams);
+                $batch->add($request);
             }
             
             $results = $batch->execute();
