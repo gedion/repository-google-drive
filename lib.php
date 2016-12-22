@@ -676,9 +676,7 @@ class repository_googledrive extends repository {
             $permissions = $this->service->permissions->listPermissions($fileid);
             return $permissions->getItems();
         } catch (Exception $e) {
-            // print("Can't access the file and so it's permissions.<br/>");
-            print "An error occurred: " . $e->getMessage();
-            print "<br/>";
+            debugging("An error occurred: " . $e->getMessage());
         }
         return null;
     }
@@ -694,7 +692,7 @@ class repository_googledrive extends repository {
             $permissionid = $this->service->permissions->getIdForEmail($gmail);
             return $permissionid->getId();
         } catch (Exception $e) {
-            print "An error occurred: " . $e->getMessage();
+            debugging("An error occurred: " . $e->getMessage());
         }
     }
 
@@ -721,8 +719,7 @@ class repository_googledrive extends repository {
                 }
             }
         } catch (Exception $e) {
-            print"User is not permitted to access the resource.<br/>";
-            // print "An error occurred: " . $e->getMessage();
+            debugging("An error occurred: " . $e->getMessage());
         }
     }
 
@@ -754,8 +751,7 @@ class repository_googledrive extends repository {
         try {
             return $this->service->permissions->insert($fileid, $newpermission, $optparams);
         } catch (Exception $e) {
-            // print("Insert permission failed. Please retry with approriate permission role.");
-            print "An error occurred: " . $e->getMessage();
+            debugging("An error occurred: " . $e->getMessage());
         }
         return null;
     }
@@ -775,8 +771,7 @@ class repository_googledrive extends repository {
                 $this->service->permissions->delete($fileid, $permissionid);
             }
         } catch (Exception $e) {
-            debugging("Delete failed...");
-            print "<br/> An error occurred: " . $e->getMessage() . "<br/>";
+            debugging("An error occurred: " . $e->getMessage());
         }
     }
 
@@ -799,7 +794,7 @@ class repository_googledrive extends repository {
             $this->remove_permission($fileid, $permissionid);
             return $this->insert_permission($fileid, $value, $type, $newrole);
         } catch (Exception $e) {
-            print "An error occurred: " . $e->getMessage();
+            debugging("An error occurred: " . $e->getMessage());
         }
         return null;
     }
@@ -820,7 +815,7 @@ class repository_googledrive extends repository {
         try {
             return $this->service->permissions->patch($fileid, $permissionid, $patchedpermission);
         } catch (Exception $e) {
-            print "An error occurred: " . $e->getMessage();
+            debugging("An error occurred: " . $e->getMessage());
         }
         return null;
     }
@@ -1049,27 +1044,25 @@ class repository_googledrive extends repository {
                 $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
                 $cmcontext = context_module::instance($cmid);
                 
-                $insertusers = array();
                 $userids = $this->get_google_authenticated_userids($courseid);
                 
                 $fileids = $this->get_fileids($cmid);
                 
-                $requests = array();
-                
+                $calls = array();
+
                 foreach ($fileids as $fileid) {
                     foreach ($userids as $userid) {
                         $gmail = $this->get_google_authenticated_users_email($userid);
                         if ($this->edit_capability($cmcontext, $userid)) {
-                            //$insertusers[$gmail] = 'writer';
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
                             $call->role = 'writer';
-                            $requests[] = $call;
-                            if (count($requests) == 1000) {
-                                $this->batch_insert_permissions($requests);
-                                unset($requests);
-                                $requests = array();
+                            $calls[] = $call;
+                            if (count($calls) == 1000) {
+                                $this->batch_insert_permissions($calls);
+                                unset($calls);
+                                $calls = array();
                             }
                         } else {
                             if ($course->visible == 1) {
@@ -1086,16 +1079,15 @@ class repository_googledrive extends repository {
                     
                                         // User can view course module, section, is enrolled in course, and cannot edit module
                                         if ($cminfo->uservisible && $secinfo->uservisible && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
-                                            //$insertusers[$gmail] = 'reader';
                                             $call = new stdClass();
                                             $call->fileid = $fileid;
                                             $call->gmail = $gmail;
                                             $call->role = 'reader';
-                                            $requests[] = $call;
-                                            if (count($requests) == 1000) {
-                                                $this->batch_insert_permissions($requests);
-                                                unset($requests);
-                                                $requests = array();
+                                            $calls[] = $call;
+                                            if (count($calls) == 1000) {
+                                                $this->batch_insert_permissions($calls);
+                                                unset($calls);
+                                                $calls = array();
                                             }
                                         }
                                         // else user cannot access course module, do nothing
@@ -1108,17 +1100,21 @@ class repository_googledrive extends repository {
                     }
                 }
 
-                if (count($requests) > 0) {
-                    $this->batch_insert_permissions($requests);
+                if (count($calls) > 0) {
+                    $this->batch_insert_permissions($calls);
                 }
 
-                // Store cmid and reference.
-                $newdata = new stdClass();
-                $newdata->courseid = $courseid;
-                $newdata->cmid = $cmid;
-                $newdata->reference = $this->get_resource($cmid);
-                if ($newdata->reference) {
-                    $DB->insert_record('repository_gdrive_references', $newdata);
+                // Store cmid and reference(s).
+                $fileids = $this->get_fileids($cmid);
+                foreach ($fileids as $fileid) {
+                    $newdata = new stdClass();
+                    $newdata->courseid = $courseid;
+                    $newdata->cmid = $cmid;
+                    $newdata->reference = $fileid;
+                    if ($newdata->reference) {
+                        $DB->insert_record('repository_gdrive_references', $newdata);
+                    }
+                    unset($newdata);
                 }
                 break;
             case '\core\event\course_module_updated':
@@ -1173,19 +1169,32 @@ class repository_googledrive extends repository {
                 }
                 break;
             case '\core\event\course_module_deleted':
-                if ($event->other['modulename'] == 'resource') {
-                    $courseid = $event->courseid;
-                    $userids = $this->get_google_authenticated_userids($courseid);
-                    $cmid = $event->contextinstanceid;
-                    $gcmid = $DB->get_record('repository_gdrive_references', array('cmid' => $cmid), 'id');
-                    if ($gcmid) {
-                        foreach ($userids as $userid) {
-                            $email = $this->get_google_authenticated_users_email($userid);
-                            $this->remove_cm_permission($cmid, $email);
+                $courseid = $event->courseid;
+                $cmid = $event->contextinstanceid;
+                $userids = $this->get_google_authenticated_userids($courseid);
+                $filerecs = $DB->get_records('repository_gdrive_references', array('cmid' => $cmid), '', 'reference');
+                $calls = array();
+                foreach ($filerecs as $filerec) {
+                    foreach ($userids as $userid) {
+                        $gmail = $this->get_google_authenticated_users_email($userid);
+                        $call = new stdClass();
+                        $call->fileid = $filerec->reference;
+                        $call->gmail = $gmail;
+                        $calls[] = $call;
+                        
+                        if (count($calls) == 1000) {
+                            $this->batch_delete_permissions($calls);
+                            unset($calls);
+                            $calls = array();
                         }
-                        $DB->delete_records('repository_gdrive_references', array('cmid' => $cmid));
                     }
                 }
+
+                if (count($calls) > 0) {
+                    $this->batch_delete_permissions($calls);
+                }
+                
+                $DB->delete_records('repository_gdrive_references', array('cmid' => $cmid));
                 break;
             case '\core\event\role_assigned':
                 break;
@@ -1434,7 +1443,7 @@ class repository_googledrive extends repository {
                 $permissionid = $this->print_permission_id_for_email($email);
                 $this->remove_permission($fileid, $permissionid);
             } catch (Exception $e) {
-                print "An error occurred: " . $e->getMessage();
+                debugging("An error occurred: " . $e->getMessage());
             }
         }
     }
@@ -1451,7 +1460,7 @@ class repository_googledrive extends repository {
         $id = $googledriverepo->id;
         if (empty($id)) {
             // We did not find any instance of googledrive.
-            mtrace('Could not find any instance of the repository');
+            debugging('Could not find any instance of the repository');
             return;
         }
 
@@ -1485,7 +1494,7 @@ class repository_googledrive extends repository {
         $id = $googledriverepo->id;
         if (empty($id)) {
             // We did not find any instance of googledrive.
-            mtrace('Could not find any instance of the repository');
+            debugging('Could not find any instance of the repository');
             return;
         }
     
@@ -1521,25 +1530,25 @@ class repository_googledrive extends repository {
         return has_capability('mod/resource:addinstance', $context, $user);
     }
     
-    // Need to limit batches to 1000 calls - $requests should be checked before calling
-    private function batch_insert_permissions($requests) {
+    // Need to limit batches to 1000 calls - $calls should be checked before calling
+    private function batch_insert_permissions($calls) {
         $type = 'user';
         $optparams = array('sendNotificationEmails' => false);
         $this->client->setUseBatch(true);
         try {
             $batch = $this->service->createBatch();
             
-            foreach ($requests as $request) {
-                $name = explode('@', $request->gmail);
+            foreach ($calls as $call) {
+                $name = explode('@', $call->gmail);
                 $newpermission = new Google_Service_Drive_Permission();
-                $newpermission->setValue($request->gmail);
+                $newpermission->setValue($call->gmail);
                 $newpermission->setType($type);
-                $newpermission->setRole($request->role);
-                $newpermission->setEmailAddress($request->gmail);
+                $newpermission->setRole($call->role);
+                $newpermission->setEmailAddress($call->gmail);
                 $newpermission->setDomain($name[1]);
                 $newpermission->setName($name[0]);
                 
-                $request = $this->service->permissions->insert($request->fileid, $newpermission, $optparams);
+                $request = $this->service->permissions->insert($call->fileid, $newpermission, $optparams);
                 $batch->add($request);
             }
             
@@ -1547,7 +1556,52 @@ class repository_googledrive extends repository {
             
             foreach ($results as $result) {
                 if ($result instanceof Google_Service_Exception) {
-                    mtrace($result);
+                    debugging($result);
+                }
+            }
+        } finally {
+            $this->client->setUseBatch(false);
+        }
+    }
+    
+    // Need to limit batches to 1000 calls - $calls should be checked before calling
+    private function batch_delete_permissions($calls) {
+        $this->client->setUseBatch(true);
+        try {
+            $batch = $this->service->createBatch();
+            
+            foreach ($calls as $call) {
+                $request = $this->service->permissions->getIdForEmail($call->gmail);
+                $batch->add($request);
+                $results = $batch->execute();
+                foreach ($results as $result) {
+                    if ($result instanceof Google_Service_Exception) {
+                        debugging($result);
+                    } else {
+                        $permissionid = $result->id;
+                    } 
+                }
+
+                $request = $this->service->permissions->get($call->fileid, $permissionid);
+                $batch->add($request);
+                $results = $batch->execute();
+                foreach ($results as $result) {
+                    if ($result instanceof Google_Service_Exception) {
+                        debugging($result);
+                    } else {
+                        if ($result->role != 'owner') {
+                            $request = $this->service->permissions->delete($call->fileid, $permissionid);
+                            $batch->add($request);
+                        }
+                    } 
+                } 
+            }
+    
+            $results = $batch->execute();
+    
+            foreach ($results as $result) {
+                if ($result instanceof Google_Service_Exception) {
+                    debugging($result);
                 }
             }
         } finally {
@@ -1573,13 +1627,13 @@ class repository_googledrive extends repository {
                     $this->remove_permission($existing->reference, $permissionid);
                     $this->insert_permission($fileid, $email,  'user', 'reader');
                 } catch (Exception $e) {
-                    print "An error occurred: " . $e->getMessage();
+                    debugging("An error occurred: " . $e->getMessage());
                 }
             } else {
                 try {
                     $this->insert_permission($fileid, $email,  'user', 'reader');
                 } catch (Exception $e) {
-                    print "An error occurred: " . $e->getMessage();
+                    debugging("An error occurred: " . $e->getMessage());
                 }
             }
         }
