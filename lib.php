@@ -712,8 +712,10 @@ class repository_googledrive extends repository {
                 break;
             case '\core\event\user_enrolment_created':
             case '\core\event\user_enrolment_updated':
+                $this->user_enrolment_created($event);
                 break;
-            case '\core\event\user_enrolment_deleted': 
+            case '\core\event\user_enrolment_deleted':
+                $this->user_enrolment_deleted($event);
                 break;
             case '\core\event\user_deleted':
                 break;
@@ -1688,6 +1690,132 @@ class repository_googledrive extends repository {
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
+        }
+        
+        if (count($deletecalls) > 0) {
+            $this->batch_delete_permissions($deletecalls);
+        }
+    }
+    
+    // Don't worry about reader/writer here - role assigned after user enroled
+    private function user_enrolment_created($event) {
+        global $DB;
+        $courseid = $event->courseid;
+        $userid = $event->relateduserid;
+        $gmail = $this->get_google_authenticated_users_email($userid);
+        if ($gmail) {
+            $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+            $coursecontext = context_course::instance($courseid);
+            $coursemodinfo = get_fast_modinfo($courseid, -1);
+            $cms = $coursemodinfo->get_cms();
+            
+            $insertcalls = array();
+            $deletecalls = array();
+            
+            foreach ($cms as $cm) {
+                $cmid = $cm->id;
+                $cmcontext = context_module::instance($cmid);
+                $fileids = $this->get_fileids($cmid);
+                if ($fileids) {
+                    foreach ($fileids as $fileid) {
+                        if ($course->visible == 1) {
+                            // Course is visible, continue checks.
+                            if ($cm->visible == 1) {
+                                // Course module is visible, continue checks.
+                                rebuild_course_cache($courseid, true);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $cminfo = $modinfo->get_cm($cmid);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                    //  User can view course module, section, and is enrolled in course.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $call->role = 'reader';
+                                    $insertcalls[] = $call;
+                                    unset($call);
+                                    if (count($insertcalls) == 1000) {
+                                        $this->batch_insert_permissions($insertcalls);
+                                        unset($insertcalls);
+                                        $insertcalls = array();
+                                    }
+                                } else {
+                                    // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $deletecalls[] = $call;
+                                    unset($call);
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        unset($deletecalls);
+                                        $deletecalls = array();
+                                    }
+                                }
+                            } else {
+                                // Course module is not visible, delete permissions.
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $gmail;
+                                $deletecalls[] = $call;
+                                unset($call);
+                                if (count($deletecalls) == 1000) {
+                                    $this->batch_delete_permissions($deletecalls);
+                                    unset($deletecalls);
+                                    $deletecalls = array();
+                                }
+                            }
+                        } else {
+                            // Course is not visible, delete permissions.
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $deletecalls[] = $call;
+                            unset($call);
+                            if (count($deletecalls) == 1000) {
+                                $this->batch_delete_permissions($deletecalls);
+                                unset($deletecalls);
+                                $deletecalls = array();
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Call any remaining batch requests.
+            if (count($insertcalls) > 0) {
+                $this->batch_insert_permissions($insertcalls);
+            }
+            
+            if (count($deletecalls) > 0) {
+                $this->batch_delete_permissions($deletecalls);
+            }
+        }   
+    }
+    
+    private function user_enrolment_deleted($event) {
+        global $DB;
+        $courseid = $event->courseid;
+        $userid = $event->relateduserid;
+        $gmail = $this->get_google_authenticated_users_email($userid);
+        $deletecalls = array();
+        if ($gmail) {
+            $filerecs = $DB->get_records('repository_gdrive_references', array('courseid' => $courseid), '', 'reference');
+            if ($filerecs) {
+                foreach ($filerecs as $filerec) {
+                    $call = new stdClass();
+                    $call->fileid = $filerec->reference;
+                    $call->gmail = $gmail;
+                    $deletecalls[] = $call;
+                    
+                    if (count($deletecalls) == 1000) {
+                        $this->batch_delete_permissions($deletecalls);
+                        unset($deletecalls);
+                        $deletecalls = array();
+                    }
+                }
+            }  
         }
         
         if (count($deletecalls) > 0) {
