@@ -708,6 +708,7 @@ class repository_googledrive extends repository {
                 break;
             case '\core\event\grouping_group_assigned':
             case '\core\event\grouping_group_unassigned':
+                $this->grouping_group_assigned($event);
                 break;
             case '\core\event\user_enrolment_created':
             case '\core\event\user_enrolment_updated':
@@ -742,46 +743,60 @@ class repository_googledrive extends repository {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
             $fileids = $this->get_fileids($cmid);
-            foreach ($fileids as $fileid) {
-                foreach ($userids as $userid) {
-                    $gmail = $this->get_google_authenticated_users_email($userid);
-                    if ($this->edit_capability($cmcontext, $userid)) {
-                        $call = new stdClass();
-                        $call->fileid = $fileid;
-                        $call->gmail = $gmail;
-                        $call->role = 'writer';
-                        $insertcalls[] = $call;
-                        unset($call);
-                        if (count($insertcalls) == 1000) {
-                            $this->batch_insert_permissions($insertcalls);
-                            unset($insertcalls);
-                            $insertcalls = array();
-                        }
-                    } else {
-                        if ($course->visible == 1) {
-                            // Course is visible, continue checks.
-                            if ($cm->visible == 1) {
-                                // Course module is visible, continue checks.
-                                rebuild_course_cache($courseid, true);
-                                $modinfo = get_fast_modinfo($courseid, $userid);
-                                $cminfo = $modinfo->get_cm($cmid);
-                                $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                $secinfo = $modinfo->get_section_info($sectionnumber);
-                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    //  User can view course module, section, is enrolled in course, and cannot edit module.
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->gmail = $gmail;
-                                    $call->role = 'reader';
-                                    $insertcalls[] = $call;
-                                    unset($call);
-                                    if (count($insertcalls) == 1000) {
-                                        $this->batch_insert_permissions($insertcalls);
-                                        unset($insertcalls);
-                                        $insertcalls = array();
+            if ($fileids) {
+                foreach ($fileids as $fileid) {
+                    foreach ($userids as $userid) {
+                        $gmail = $this->get_google_authenticated_users_email($userid);
+                        if ($this->edit_capability($cmcontext, $userid)) {
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $call->role = 'writer';
+                            $insertcalls[] = $call;
+                            unset($call);
+                            if (count($insertcalls) == 1000) {
+                                $this->batch_insert_permissions($insertcalls);
+                                unset($insertcalls);
+                                $insertcalls = array();
+                            }
+                        } else {
+                            if ($course->visible == 1) {
+                                // Course is visible, continue checks.
+                                if ($cm->visible == 1) {
+                                    // Course module is visible, continue checks.
+                                    rebuild_course_cache($courseid, true);
+                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $cminfo = $modinfo->get_cm($cmid);
+                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                        //  User can view course module, section, is enrolled in course, and cannot edit module.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $call->role = 'reader';
+                                        $insertcalls[] = $call;
+                                        unset($call);
+                                        if (count($insertcalls) == 1000) {
+                                            $this->batch_insert_permissions($insertcalls);
+                                            unset($insertcalls);
+                                            $insertcalls = array();
+                                        }
+                                    } else {
+                                        // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $deletecalls[] = $call;
+                                        unset($call);
+                                        if (count($deletecalls) == 1000) {
+                                            $this->batch_delete_permissions($deletecalls);
+                                            unset($deletecalls);
+                                            $deletecalls = array();
+                                        }
                                     }
                                 } else {
-                                    // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                    // Course module is not visible, delete permissions.
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $gmail;
@@ -794,7 +809,7 @@ class repository_googledrive extends repository {
                                     }
                                 }
                             } else {
-                                // Course module is not visible, delete permissions.
+                                // Course is not visible, delete permissions.
                                 $call = new stdClass();
                                 $call->fileid = $fileid;
                                 $call->gmail = $gmail;
@@ -805,18 +820,6 @@ class repository_googledrive extends repository {
                                     unset($deletecalls);
                                     $deletecalls = array();
                                 }
-                            }
-                        } else {
-                            // Course is not visible, delete permissions.
-                            $call = new stdClass();
-                            $call->fileid = $fileid;
-                            $call->gmail = $gmail;
-                            $deletecalls[] = $call;
-                            unset($call);
-                            if (count($deletecalls) == 1000) {
-                                $this->batch_delete_permissions($deletecalls);
-                                unset($deletecalls);
-                                $deletecalls = array();
                             }
                         }
                     }
@@ -850,61 +853,63 @@ class repository_googledrive extends repository {
         $fileids = $this->get_fileids($cmid);
         $insertcalls = array();
         
-        foreach ($fileids as $fileid) {
-            foreach ($userids as $userid) {
-                $gmail = $this->get_google_authenticated_users_email($userid);
-                if ($this->edit_capability($cmcontext, $userid)) {
-                    $call = new stdClass();
-                    $call->fileid = $fileid;
-                    $call->gmail = $gmail;
-                    $call->role = 'writer';
-                    $insertcalls[] = $call;
-                    unset($call);
-                    if (count($insertcalls) == 1000) {
-                        $this->batch_insert_permissions($insertcalls);
-                        unset($insertcalls);
-                        $insertcalls = array();
-                    }
-                } else {
-                    if ($course->visible == 1) {
-                        // Course is visible, continue checks
-                        if ($cm->visible == 1) {
-                            // Course module is visible, continue checks
-                            rebuild_course_cache($courseid, true);
-                            $sectionnumber = $this->get_cm_sectionnum($cmid);
-                            $modinfo = get_fast_modinfo($courseid, $userid);
-                            $secinfo = $modinfo->get_section_info($sectionnumber);
-                            $cminfo = $modinfo->get_cm($cmid);
-        
-                            // User can view course module, section, is enrolled in course, and cannot edit module
-                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
-                                $call = new stdClass();
-                                $call->fileid = $fileid;
-                                $call->gmail = $gmail;
-                                $call->role = 'reader';
-                                $insertcalls[] = $call;
-                                unset($call);
-                                if (count($insertcalls) == 1000) {
-                                    $this->batch_insert_permissions($insertcalls);
-                                    unset($insertcalls);
-                                    $insertcalls = array();
-                                }
-                            }
-                            // else user cannot access course module, do nothing
+        if ($fileids) {
+            foreach ($fileids as $fileid) {
+                foreach ($userids as $userid) {
+                    $gmail = $this->get_google_authenticated_users_email($userid);
+                    if ($this->edit_capability($cmcontext, $userid)) {
+                        $call = new stdClass();
+                        $call->fileid = $fileid;
+                        $call->gmail = $gmail;
+                        $call->role = 'writer';
+                        $insertcalls[] = $call;
+                        unset($call);
+                        if (count($insertcalls) == 1000) {
+                            $this->batch_insert_permissions($insertcalls);
+                            unset($insertcalls);
+                            $insertcalls = array();
                         }
-                        // else course module not visible, do nothing
+                    } else {
+                        if ($course->visible == 1) {
+                            // Course is visible, continue checks
+                            if ($cm->visible == 1) {
+                                // Course module is visible, continue checks
+                                rebuild_course_cache($courseid, true);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                $cminfo = $modinfo->get_cm($cmid);
+            
+                                // User can view course module, section, is enrolled in course, and cannot edit module
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $call->role = 'reader';
+                                    $insertcalls[] = $call;
+                                    unset($call);
+                                    if (count($insertcalls) == 1000) {
+                                        $this->batch_insert_permissions($insertcalls);
+                                        unset($insertcalls);
+                                        $insertcalls = array();
+                                    }
+                                }
+                                // else user cannot access course module, do nothing
+                            }
+                            // else course module not visible, do nothing
+                        }
+                        // else course not visible, do nothing
                     }
-                    // else course not visible, do nothing
                 }
+            
+                // Store cmid and reference(s).
+                $newdata = new stdClass();
+                $newdata->courseid = $courseid;
+                $newdata->cmid = $cmid;
+                $newdata->reference = $fileid;
+                $DB->insert_record('repository_gdrive_references', $newdata);
+                unset($newdata);
             }
-        
-            // Store cmid and reference(s).
-            $newdata = new stdClass();
-            $newdata->courseid = $courseid;
-            $newdata->cmid = $cmid;
-            $newdata->reference = $fileid;
-            $DB->insert_record('repository_gdrive_references', $newdata);
-            unset($newdata);
         }
         
         if (count($insertcalls) > 0) {
@@ -932,47 +937,61 @@ class repository_googledrive extends repository {
         $deletecalls = array();
         
         // Check and ajust permissions for current file ids for module.
-        foreach ($fileids as $fileid) {
-            foreach ($userids as $userid) {
-                $gmail = $this->get_google_authenticated_users_email($userid);
-                if ($this->edit_capability($cmcontext, $userid)) {
-                    $call = new stdClass();
-                    $call->fileid = $fileid;
-                    $call->gmail = $gmail;
-                    $call->role = 'writer';
-                    $insertcalls[] = $call;
-                    unset($call);
-                    if (count($insertcalls) == 1000) {
-                        $this->batch_insert_permissions($insertcalls);
-                        unset($insertcalls);
-                        $insertcalls = array();
-                    }
-                } else {
-                    if ($course->visible == 1) {
-                        // Course is visible, continue checks
-                        if ($cm->visible == 1) {
-                            // Course module is visible, continue checks
-                            rebuild_course_cache($courseid, true);
-                            $sectionnumber = $this->get_cm_sectionnum($cmid);
-                            $modinfo = get_fast_modinfo($courseid, $userid);
-                            $secinfo = $modinfo->get_section_info($sectionnumber);
-                            $cminfo = $modinfo->get_cm($cmid);
-        
-                            // User can view course module, section, is enrolled in course, and cannot edit module
-                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
-                                $call = new stdClass();
-                                $call->fileid = $fileid;
-                                $call->gmail = $gmail;
-                                $call->role = 'reader';
-                                $insertcalls[] = $call;
-                                unset($call);
-                                if (count($insertcalls) == 1000) {
-                                    $this->batch_insert_permissions($insertcalls);
-                                    unset($insertcalls);
-                                    $insertcalls = array();
+        if ($fileids) {
+            foreach ($fileids as $fileid) {
+                foreach ($userids as $userid) {
+                    $gmail = $this->get_google_authenticated_users_email($userid);
+                    if ($this->edit_capability($cmcontext, $userid)) {
+                        $call = new stdClass();
+                        $call->fileid = $fileid;
+                        $call->gmail = $gmail;
+                        $call->role = 'writer';
+                        $insertcalls[] = $call;
+                        unset($call);
+                        if (count($insertcalls) == 1000) {
+                            $this->batch_insert_permissions($insertcalls);
+                            unset($insertcalls);
+                            $insertcalls = array();
+                        }
+                    } else {
+                        if ($course->visible == 1) {
+                            // Course is visible, continue checks
+                            if ($cm->visible == 1) {
+                                // Course module is visible, continue checks
+                                rebuild_course_cache($courseid, true);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                $cminfo = $modinfo->get_cm($cmid);
+            
+                                // User can view course module, section, is enrolled in course, and cannot edit module
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $call->role = 'reader';
+                                    $insertcalls[] = $call;
+                                    unset($call);
+                                    if (count($insertcalls) == 1000) {
+                                        $this->batch_insert_permissions($insertcalls);
+                                        unset($insertcalls);
+                                        $insertcalls = array();
+                                    }
+                                } else {
+                                    // User cannot view course module, or section, or is not enrolled in course
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $deletecalls[] = $call;
+                                    unset($call);
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        unset($deletecalls);
+                                        $deletecalls = array();
+                                    }
                                 }
                             } else {
-                                // User cannot view course module, or section, or is not enrolled in course
+                                // Course module is not visible
                                 $call = new stdClass();
                                 $call->fileid = $fileid;
                                 $call->gmail = $gmail;
@@ -985,7 +1004,7 @@ class repository_googledrive extends repository {
                                 }
                             }
                         } else {
-                            // Course module is not visible
+                            // Course is not visible
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
@@ -996,18 +1015,6 @@ class repository_googledrive extends repository {
                                 unset($deletecalls);
                                 $deletecalls = array();
                             }
-                        }
-                    } else {
-                        // Course is not visible
-                        $call = new stdClass();
-                        $call->fileid = $fileid;
-                        $call->gmail = $gmail;
-                        $deletecalls[] = $call;
-                        unset($call);
-                        if (count($deletecalls) == 1000) {
-                            $this->batch_delete_permissions($deletecalls);
-                            unset($deletecalls);
-                            $deletecalls = array();
                         }
                     }
                 }
@@ -1109,14 +1116,122 @@ class repository_googledrive extends repository {
             $userids = $this->get_google_authenticated_userids($courseid);
             $coursemodinfo = get_fast_modinfo($courseid, -1);
             $cms = $coursemodinfo->get_cms();
-            //$cms = array();
-            //foreach ($coursemods as $coursemod) {
-            //    $cms[] = $coursemod;
-            //}
             foreach ($cms as $cm) {
                 $cmid = $cm->id;
                 $cmcontext = context_module::instance($cmid);
                 $fileids = $this->get_fileids($cmid);
+                if ($fileids) {
+                    foreach ($fileids as $fileid) {
+                        foreach ($userids as $userid) {
+                            $gmail = $this->get_google_authenticated_users_email($userid);
+                            if ($this->edit_capability($cmcontext, $userid)) {
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $gmail;
+                                $call->role = 'writer';
+                                $insertcalls[] = $call;
+                                unset($call);
+                                if (count($insertcalls) == 1000) {
+                                    $this->batch_insert_permissions($insertcalls);
+                                    unset($insertcalls);
+                                    $insertcalls = array();
+                                }
+                            } else {
+                                if ($course->visible == 1) {
+                                    // Course is visible, continue checks.
+                                    if ($cm->visible == 1) {
+                                        // Course module is visible, continue checks.
+                                        rebuild_course_cache($courseid, true);
+                                        $modinfo = get_fast_modinfo($courseid, $userid);
+                                        $cminfo = $modinfo->get_cm($cmid);
+                                        $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                        $secinfo = $modinfo->get_section_info($sectionnumber);
+                                        if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                            //  User can view course module, section, is enrolled in course, and cannot edit module.
+                                            $call = new stdClass();
+                                            $call->fileid = $fileid;
+                                            $call->gmail = $gmail;
+                                            $call->role = 'reader';
+                                            $insertcalls[] = $call;
+                                            unset($call);
+                                            if (count($insertcalls) == 1000) {
+                                                $this->batch_insert_permissions($insertcalls);
+                                                unset($insertcalls);
+                                                $insertcalls = array();
+                                            }
+                                        } else {
+                                            // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                            $call = new stdClass();
+                                            $call->fileid = $fileid;
+                                            $call->gmail = $gmail;
+                                            $deletecalls[] = $call;
+                                            unset($call);
+                                            if (count($deletecalls) == 1000) {
+                                                $this->batch_delete_permissions($deletecalls);
+                                                unset($deletecalls);
+                                                $deletecalls = array();
+                                            }
+                                        }
+                                    } else {
+                                        // Course module is not visible, delete permissions.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $deletecalls[] = $call;
+                                        unset($call);
+                                        if (count($deletecalls) == 1000) {
+                                            $this->batch_delete_permissions($deletecalls);
+                                            unset($deletecalls);
+                                            $deletecalls = array();
+                                        }
+                                    }
+                                } else {
+                                    // Course is not visible, delete permissions.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $deletecalls[] = $call;
+                                    unset($call);
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        unset($deletecalls);
+                                        $deletecalls = array();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }       
+        }
+        
+        // Call any remaining batch requests.
+        if (count($insertcalls) > 0) {
+            $this->batch_insert_permissions($insertcalls);
+        }
+        
+        if (count($deletecalls) > 0) {
+            $this->batch_delete_permissions($deletecalls);
+        }
+    }
+    
+    private function course_updated($event) {
+        global $DB;
+        $courseid = $event->courseid;
+        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+        $coursecontext = context_course::instance($courseid);
+        $userids = $this->get_google_authenticated_userids($courseid);
+        $coursemodinfo = get_fast_modinfo($courseid, -1);
+        $cms = $coursemodinfo->get_cms();
+        
+        $insertcalls = array();
+        $deletecalls = array();
+        
+        foreach ($cms as $cm) {
+            $cmid = $cm->id;
+            $cmcontext = context_module::instance($cmid);
+            $fileids = $this->get_fileids($cmid);
+            if ($fileids) {
                 foreach ($fileids as $fileid) {
                     foreach ($userids as $userid) {
                         $gmail = $this->get_google_authenticated_users_email($userid);
@@ -1194,114 +1309,6 @@ class repository_googledrive extends repository {
                                     $deletecalls = array();
                                 }
                             }
-                        }   
-                    }
-                }
-            }       
-        }
-        
-        // Call any remaining batch requests.
-        if (count($insertcalls) > 0) {
-            $this->batch_insert_permissions($insertcalls);
-        }
-        
-        if (count($deletecalls) > 0) {
-            $this->batch_delete_permissions($deletecalls);
-        }
-    }
-    
-    private function course_updated($event) {
-        global $DB;
-        $courseid = $event->courseid;
-        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
-        $coursecontext = context_course::instance($courseid);
-        $userids = $this->get_google_authenticated_userids($courseid);
-        $coursemodinfo = get_fast_modinfo($courseid, -1);
-        $cms = $coursemodinfo->get_cms();
-        
-        $insertcalls = array();
-        $deletecalls = array();
-        
-        foreach ($cms as $cm) {
-            $cmid = $cm->id;
-            $cmcontext = context_module::instance($cmid);
-            $fileids = $this->get_fileids($cmid);
-            foreach ($fileids as $fileid) {
-                foreach ($userids as $userid) {
-                    $gmail = $this->get_google_authenticated_users_email($userid);
-                    if ($this->edit_capability($cmcontext, $userid)) {
-                        $call = new stdClass();
-                        $call->fileid = $fileid;
-                        $call->gmail = $gmail;
-                        $call->role = 'writer';
-                        $insertcalls[] = $call;
-                        unset($call);
-                        if (count($insertcalls) == 1000) {
-                            $this->batch_insert_permissions($insertcalls);
-                            unset($insertcalls);
-                            $insertcalls = array();
-                        }
-                    } else {
-                        if ($course->visible == 1) {
-                            // Course is visible, continue checks.
-                            if ($cm->visible == 1) {
-                                // Course module is visible, continue checks.
-                                rebuild_course_cache($courseid, true);
-                                $modinfo = get_fast_modinfo($courseid, $userid);
-                                $cminfo = $modinfo->get_cm($cmid);
-                                $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                $secinfo = $modinfo->get_section_info($sectionnumber);
-                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    //  User can view course module, section, is enrolled in course, and cannot edit module.
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->gmail = $gmail;
-                                    $call->role = 'reader';
-                                    $insertcalls[] = $call;
-                                    unset($call);
-                                    if (count($insertcalls) == 1000) {
-                                        $this->batch_insert_permissions($insertcalls);
-                                        unset($insertcalls);
-                                        $insertcalls = array();
-                                    }
-                                } else {
-                                    // User cannot view course module, or section, or is not enrolled in course; delete permissions.
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->gmail = $gmail;
-                                    $deletecalls[] = $call;
-                                    unset($call);
-                                    if (count($deletecalls) == 1000) {
-                                        $this->batch_delete_permissions($deletecalls);
-                                        unset($deletecalls);
-                                        $deletecalls = array();
-                                    }
-                                }
-                            } else {
-                                // Course module is not visible, delete permissions.
-                                $call = new stdClass();
-                                $call->fileid = $fileid;
-                                $call->gmail = $gmail;
-                                $deletecalls[] = $call;
-                                unset($call);
-                                if (count($deletecalls) == 1000) {
-                                    $this->batch_delete_permissions($deletecalls);
-                                    unset($deletecalls);
-                                    $deletecalls = array();
-                                }
-                            }
-                        } else {
-                            // Course is not visible, delete permissions.
-                            $call = new stdClass();
-                            $call->fileid = $fileid;
-                            $call->gmail = $gmail;
-                            $deletecalls[] = $call;
-                            unset($call);
-                            if (count($deletecalls) == 1000) {
-                                $this->batch_delete_permissions($deletecalls);
-                                unset($deletecalls);
-                                $deletecalls = array();
-                            }
                         }
                     }
                 }
@@ -1365,9 +1372,127 @@ class repository_googledrive extends repository {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
             $fileids = $this->get_fileids($cmid);
-            foreach ($fileids as $fileid) {
-                foreach ($userids as $userid) {
-                    $gmail = $this->get_google_authenticated_users_email($userid);
+            if ($fileids) {
+                foreach ($fileids as $fileid) {
+                    foreach ($userids as $userid) {
+                        $gmail = $this->get_google_authenticated_users_email($userid);
+                        if ($this->edit_capability($cmcontext, $userid)) {
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $call->role = 'writer';
+                            $insertcalls[] = $call;
+                            unset($call);
+                            if (count($insertcalls) == 1000) {
+                                $this->batch_insert_permissions($insertcalls);
+                                unset($insertcalls);
+                                $insertcalls = array();
+                            }
+                        } else {
+                            if ($course->visible == 1) {
+                                // Course is visible, continue checks.
+                                if ($cm->visible == 1) {
+                                    // Course module is visible, continue checks.
+                                    rebuild_course_cache($courseid, true);
+                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $cminfo = $modinfo->get_cm($cmid);
+                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                        //  User can view course module, section, is enrolled in course, and cannot edit module.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $call->role = 'reader';
+                                        $insertcalls[] = $call;
+                                        unset($call);
+                                        if (count($insertcalls) == 1000) {
+                                            $this->batch_insert_permissions($insertcalls);
+                                            unset($insertcalls);
+                                            $insertcalls = array();
+                                        }
+                                    } else {
+                                        // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $deletecalls[] = $call;
+                                        unset($call);
+                                        if (count($deletecalls) == 1000) {
+                                            $this->batch_delete_permissions($deletecalls);
+                                            unset($deletecalls);
+                                            $deletecalls = array();
+                                        }
+                                    }
+                                } else {
+                                    // Course module is not visible, delete permissions.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $deletecalls[] = $call;
+                                    unset($call);
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        unset($deletecalls);
+                                        $deletecalls = array();
+                                    }
+                                }
+                            } else {
+                                // Course is not visible, delete permissions.
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $gmail;
+                                $deletecalls[] = $call;
+                                unset($call);
+                                if (count($deletecalls) == 1000) {
+                                    $this->batch_delete_permissions($deletecalls);
+                                    unset($deletecalls);
+                                    $deletecalls = array();
+                                }
+                            }
+                        }
+                    }
+                
+                    $newdata = new stdClass();
+                    $newdata->courseid = $courseid;
+                    $newdata->cmid = $cmid;
+                    $newdata->reference = $fileid;
+                    $DB->insert_record('repository_gdrive_references', $newdata);
+                }
+                }
+                
+                // Call any remaining batch requests.
+                if (count($insertcalls) > 0) {
+                    $this->batch_insert_permissions($insertcalls);
+                }
+                
+                if (count($deletecalls) > 0) {
+                    $this->batch_delete_permissions($deletecalls);
+                }
+            }
+    }
+    
+    private function group_member_added($event) {
+        global $DB;
+        $groupid = $event->objectid;
+        $userid = $event->relateduserid;
+        $gmail = $this->get_google_authenticated_users_email($userid);
+        $group = groups_get_group($groupid, 'courseid');
+        $courseid = $group->courseid;
+        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+        $coursecontext = context_course::instance($courseid);
+        $coursemodinfo = get_fast_modinfo($courseid, -1);
+        $cms = $coursemodinfo->get_cms();
+        
+        $insertcalls = array();
+        $deletecalls = array();
+        
+        foreach ($cms as $cm) {
+            $cmid = $cm->id;
+            $cmcontext = context_module::instance($cmid);
+            $fileids = $this->get_fileids($cmid);
+            if ($fileids) {
+                foreach ($fileids as $fileid) {
                     if ($this->edit_capability($cmcontext, $userid)) {
                         $call = new stdClass();
                         $call->fileid = $fileid;
@@ -1444,12 +1569,6 @@ class repository_googledrive extends repository {
                         }
                     }
                 }
-                
-                $newdata = new stdClass();
-                $newdata->courseid = $courseid;
-                $newdata->cmid = $cmid;
-                $newdata->reference = $fileid;
-                $DB->insert_record('repository_gdrive_references', $newdata);
             }
         }
         
@@ -1463,11 +1582,10 @@ class repository_googledrive extends repository {
         }
     }
     
-    private function group_member_added($event) {
+    private function grouping_group_assigned($event) {
         global $DB;
-        $groupid = $event->objectid;
-        $userid = $event->relateduserid;
-        $gmail = $this->get_google_authenticated_users_email($userid);
+        $groupid = $event->other['groupid'];
+        $members = groups_get_members($groupid, 'userid');
         $group = groups_get_group($groupid, 'courseid');
         $courseid = $group->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
@@ -1482,44 +1600,74 @@ class repository_googledrive extends repository {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
             $fileids = $this->get_fileids($cmid);
-            foreach ($fileids as $fileid) {
-                if ($this->edit_capability($cmcontext, $userid)) {
-                    $call = new stdClass();
-                    $call->fileid = $fileid;
-                    $call->gmail = $gmail;
-                    $call->role = 'writer';
-                    $insertcalls[] = $call;
-                    unset($call);
-                    if (count($insertcalls) == 1000) {
-                        $this->batch_insert_permissions($insertcalls);
-                        unset($insertcalls);
-                        $insertcalls = array();
-                    }
-                } else {
-                    if ($course->visible == 1) {
-                        // Course is visible, continue checks.
-                        if ($cm->visible == 1) {
-                            // Course module is visible, continue checks.
-                            rebuild_course_cache($courseid, true);
-                            $modinfo = get_fast_modinfo($courseid, $userid);
-                            $cminfo = $modinfo->get_cm($cmid);
-                            $sectionnumber = $this->get_cm_sectionnum($cmid);
-                            $secinfo = $modinfo->get_section_info($sectionnumber);
-                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                //  User can view course module, section, is enrolled in course, and cannot edit module.
-                                $call = new stdClass();
-                                $call->fileid = $fileid;
-                                $call->gmail = $gmail;
-                                $call->role = 'reader';
-                                $insertcalls[] = $call;
-                                unset($call);
-                                if (count($insertcalls) == 1000) {
-                                    $this->batch_insert_permissions($insertcalls);
-                                    unset($insertcalls);
-                                    $insertcalls = array();
+            if ($fileids) {
+                foreach ($fileids as $fileid) {
+                    foreach ($members as $member) {
+                        $userid = $member->userid;
+                        $gmail = $this->get_google_authenticated_users_email($userid);
+                        if ($this->edit_capability($cmcontext, $userid)) {
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $call->role = 'writer';
+                            $insertcalls[] = $call;
+                            unset($call);
+                            if (count($insertcalls) == 1000) {
+                                $this->batch_insert_permissions($insertcalls);
+                                unset($insertcalls);
+                                $insertcalls = array();
+                            }
+                        } else {
+                            if ($course->visible == 1) {
+                                // Course is visible, continue checks.
+                                if ($cm->visible == 1) {
+                                    // Course module is visible, continue checks.
+                                    rebuild_course_cache($courseid, true);
+                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $cminfo = $modinfo->get_cm($cmid);
+                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                        //  User can view course module, section, is enrolled in course, and cannot edit module.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $call->role = 'reader';
+                                        $insertcalls[] = $call;
+                                        unset($call);
+                                        if (count($insertcalls) == 1000) {
+                                            $this->batch_insert_permissions($insertcalls);
+                                            unset($insertcalls);
+                                            $insertcalls = array();
+                                        }
+                                    } else {
+                                        // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                        $call = new stdClass();
+                                        $call->fileid = $fileid;
+                                        $call->gmail = $gmail;
+                                        $deletecalls[] = $call;
+                                        unset($call);
+                                        if (count($deletecalls) == 1000) {
+                                            $this->batch_delete_permissions($deletecalls);
+                                            unset($deletecalls);
+                                            $deletecalls = array();
+                                        }
+                                    }
+                                } else {
+                                    // Course module is not visible, delete permissions.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $deletecalls[] = $call;
+                                    unset($call);
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        unset($deletecalls);
+                                        $deletecalls = array();
+                                    }
                                 }
                             } else {
-                                // User cannot view course module, or section, or is not enrolled in course; delete permissions.
+                                // Course is not visible, delete permissions.
                                 $call = new stdClass();
                                 $call->fileid = $fileid;
                                 $call->gmail = $gmail;
@@ -1531,30 +1679,6 @@ class repository_googledrive extends repository {
                                     $deletecalls = array();
                                 }
                             }
-                        } else {
-                            // Course module is not visible, delete permissions.
-                            $call = new stdClass();
-                            $call->fileid = $fileid;
-                            $call->gmail = $gmail;
-                            $deletecalls[] = $call;
-                            unset($call);
-                            if (count($deletecalls) == 1000) {
-                                $this->batch_delete_permissions($deletecalls);
-                                unset($deletecalls);
-                                $deletecalls = array();
-                            }
-                        }
-                    } else {
-                        // Course is not visible, delete permissions.
-                        $call = new stdClass();
-                        $call->fileid = $fileid;
-                        $call->gmail = $gmail;
-                        $deletecalls[] = $call;
-                        unset($call);
-                        if (count($deletecalls) == 1000) {
-                            $this->batch_delete_permissions($deletecalls);
-                            unset($deletecalls);
-                            $deletecalls = array();
                         }
                     }
                 }
