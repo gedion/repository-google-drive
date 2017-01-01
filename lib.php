@@ -684,6 +684,9 @@ class repository_googledrive extends repository {
             case '\core\event\course_restored':
                 $this->course_restored($event);
                 break;
+            case '\tool_recyclebin\event\course_bin_item_restored':
+                //$this->course_bin_item_restored($event);
+                break;
             case '\core\event\course_section_updated':
                 $this->course_section_updated($event);
                 break;
@@ -700,6 +703,7 @@ class repository_googledrive extends repository {
                 $this->role_assigned($event);
                 break;
             case '\core\event\role_unassigned':
+                $this->role_unassigned($event);
                 break;
             case '\core\event\role_capabilities_updated':
                 break;
@@ -1108,7 +1112,6 @@ class repository_googledrive extends repository {
     private function role_assigned($event) {
         global $DB;
         $userid = $event->relateduserid;
-        $roleid = $event->objectid;
         $gmail = $this->get_google_authenticated_users_email($userid);
         
         $courseid = $event->courseid;
@@ -1212,6 +1215,45 @@ class repository_googledrive extends repository {
         
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
+        }
+    }
+    
+    private function role_unassigned($event) {
+        global $DB;
+        $userid = $event->relateduserid;
+        $gmail = $this->get_google_authenticated_users_email($userid);
+        $courseid = $event->courseid;
+        $coursemodinfo = get_fast_modinfo($courseid, -1);
+        $cms = $coursemodinfo->get_cms();
+        
+        $patchcalls = array();
+
+        foreach ($cms as $cm) {
+            $cmid = $cm->id;
+            $cmcontext = context_module::instance($cmid);
+            $fileids = $this->get_fileids($cmid);
+            if ($fileids) {
+                foreach ($fileids as $fileid) {
+                    if (!$this->edit_capability($cmcontext, $userid)) {
+                        $call = new stdClass();
+                        $call->fileid = $fileid;
+                        $call->gmail = $gmail;
+                        $call->role = 'reader';
+                        $patchcalls[] = $call;
+                        unset($call);
+                        if (count($patchcalls) == 1000) {
+                            $this->batch_patch_permissions($patchcalls);
+                            unset($patchcalls);
+                            $patchcalls = array();
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Call any remaining batch requests.
+        if (count($patchcalls) > 0) {
+            $this->batch_patch_permissions($patchcalls);
         }
     }
     
@@ -1584,6 +1626,11 @@ class repository_googledrive extends repository {
                     $this->batch_delete_permissions($deletecalls);
                 }
             }
+    }
+    
+    private function course_bin_item_restored($event) {
+        global $DB;
+        // New course module is created, but no info on it is stored in event
     }
     
     private function group_member_added($event) {
@@ -2111,6 +2158,42 @@ class repository_googledrive extends repository {
     
             $results = $batch->execute();
     
+            foreach ($results as $result) {
+                if ($result instanceof Google_Service_Exception) {
+                    debugging($result);
+                }
+            }
+        } finally {
+            $this->client->setUseBatch(false);
+        }
+    }
+    
+    // Need to limit batches to 1000 calls - $calls should be checked before calling
+    private function batch_patch_permissions($calls) {
+        $this->client->setUseBatch(true);
+        try {
+            $batch = $this->service->createBatch();
+            
+            foreach ($calls as $call) {
+                $request = $this->service->permissions->getIdForEmail($call->gmail);
+                $batch->add($request);
+                $results = $batch->execute();
+                foreach ($results as $result) {
+                    if ($result instanceof Google_Service_Exception) {
+                        debugging($result);
+                    } else {
+                        $permissionid = $result->id;
+                    }
+                }
+                
+                $patchedpermission = new Google_Service_Drive_Permission();
+                $patchedpermission->setRole($call->role);
+                $request = $this->service->permissions->patch($call->fileid, $permissionid, $patchedpermission);
+                $batch->add($request);
+            }
+        
+            $results = $batch->execute();
+        
             foreach ($results as $result) {
                 if ($result instanceof Google_Service_Exception) {
                     debugging($result);

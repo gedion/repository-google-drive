@@ -37,6 +37,10 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
+        'eventname'   => '\tool_recyclebin\event\course_bin_item_restored',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\course_section_updated',
         'callback'    => $callback
     ),
