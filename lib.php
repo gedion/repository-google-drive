@@ -706,7 +706,7 @@ class repository_googledrive extends repository {
                 $this->role_unassigned($event);
                 break;
             case '\core\event\role_capabilities_updated':
-                //$this->role_capabilities_updated($event);
+                $this->role_capabilities_updated($event);
                 break;
             case '\core\event\group_member_added':
             case '\core\event\group_member_removed':
@@ -756,7 +756,7 @@ class repository_googledrive extends repository {
                 foreach ($fileids as $fileid) {
                     foreach ($userids as $userid) {
                         $gmail = $this->get_google_authenticated_users_email($userid);
-                        if ($this->edit_capability($cmcontext, $userid)) {
+                        if ($this->writer_capability($cmcontext, $userid)) {
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
@@ -866,7 +866,7 @@ class repository_googledrive extends repository {
             foreach ($fileids as $fileid) {
                 foreach ($userids as $userid) {
                     $gmail = $this->get_google_authenticated_users_email($userid);
-                    if ($this->edit_capability($cmcontext, $userid)) {
+                    if ($this->writer_capability($cmcontext, $userid)) {
                         $call = new stdClass();
                         $call->fileid = $fileid;
                         $call->gmail = $gmail;
@@ -890,7 +890,7 @@ class repository_googledrive extends repository {
                                 $cminfo = $modinfo->get_cm($cmid);
             
                                 // User can view course module, section, is enrolled in course, and cannot edit module
-                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->writer_capability($cmcontext, $userid)) {
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $gmail;
@@ -950,7 +950,7 @@ class repository_googledrive extends repository {
             foreach ($fileids as $fileid) {
                 foreach ($userids as $userid) {
                     $gmail = $this->get_google_authenticated_users_email($userid);
-                    if ($this->edit_capability($cmcontext, $userid)) {
+                    if ($this->writer_capability($cmcontext, $userid)) {
                         $call = new stdClass();
                         $call->fileid = $fileid;
                         $call->gmail = $gmail;
@@ -974,7 +974,7 @@ class repository_googledrive extends repository {
                                 $cminfo = $modinfo->get_cm($cmid);
             
                                 // User can view course module, section, is enrolled in course, and cannot edit module
-                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->edit_capability($cmcontext, $userid)) {
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->writer_capability($cmcontext, $userid)) {
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $gmail;
@@ -1130,7 +1130,7 @@ class repository_googledrive extends repository {
             $fileids = $this->get_fileids($cmid);
             if ($fileids) {
                 foreach ($fileids as $fileid) {
-                    if ($this->edit_capability($cmcontext, $userid)) {
+                    if ($this->writer_capability($cmcontext, $userid)) {
                         $call = new stdClass();
                         $call->fileid = $fileid;
                         $call->gmail = $gmail;
@@ -1235,7 +1235,7 @@ class repository_googledrive extends repository {
             $fileids = $this->get_fileids($cmid);
             if ($fileids) {
                 foreach ($fileids as $fileid) {
-                    if (!$this->edit_capability($cmcontext, $userid)) {
+                    if (!$this->writer_capability($cmcontext, $userid)) {
                         $call = new stdClass();
                         $call->fileid = $fileid;
                         $call->gmail = $gmail;
@@ -1261,23 +1261,23 @@ class repository_googledrive extends repository {
     private function role_capabilities_updated($event) {
         global $DB;
         $roleid = $event->objectid;
-        //$userids = $DB->get_records('mdl_role_assignments', array('roleid' => $roleid), '', 'id, userid');
-        $sql = 'SELECT DISTINCT c.id 
-                FROM mdl_course c 
-                LEFT JOIN mdl_context ct
+        $sql = "SELECT DISTINCT c.id, c.visible 
+                FROM {course} c 
+                LEFT JOIN {context} ct
                 ON c.id = ct.instanceid 
-                LEFT JOIN mdl_role_assignments ra 
+                LEFT JOIN {role_assignments} ra 
                 ON ra.contextid = ct.id 
-                WHERE ra.roleid = :roleid';
+                WHERE ra.roleid = :roleid";
         
         // Get courses affected by role capability update
         $courses = $DB->get_records_sql($sql, array('roleid' => $roleid));
         
         // Get userids affected by role capability update
-        $userids = $DB->get_records('role_assignments', array('roleid' => $roleid), '', 'id, userid');
+        $users = $DB->get_records('role_assignments', array('roleid' => $roleid), '', 'id, userid');
         
         $insertcalls = array();
         $deletecalls = array();
+        $patchcalls = array();
         
         foreach ($courses as $course) {
             $courseid = $course->id;
@@ -1291,9 +1291,10 @@ class repository_googledrive extends repository {
                 $fileids = $this->get_fileids($cmid);
                 if ($fileids) {
                     foreach ($fileids as $fileid) {
-                        foreach ($userids as $userid) {
+                        foreach ($users as $user) {
+                            $userid = $user->userid;
                             $gmail = $this->get_google_authenticated_users_email($userid);
-                            if ($this->edit_capability($cmcontext, $userid)) {
+                            if ($this->writer_capability($cmcontext, $userid)) {
                                 // if addinstance, insert ‘writer’ permission
                                 $call = new stdClass();
                                 $call->fileid = $fileid;
@@ -1427,7 +1428,7 @@ class repository_googledrive extends repository {
                     foreach ($fileids as $fileid) {
                         foreach ($userids as $userid) {
                             $gmail = $this->get_google_authenticated_users_email($userid);
-                            if ($this->edit_capability($cmcontext, $userid)) {
+                            if ($this->writer_capability($cmcontext, $userid)) {
                                 $call = new stdClass();
                                 $call->fileid = $fileid;
                                 $call->gmail = $gmail;
@@ -1538,7 +1539,7 @@ class repository_googledrive extends repository {
                 foreach ($fileids as $fileid) {
                     foreach ($userids as $userid) {
                         $gmail = $this->get_google_authenticated_users_email($userid);
-                        if ($this->edit_capability($cmcontext, $userid)) {
+                        if ($this->writer_capability($cmcontext, $userid)) {
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
@@ -1679,7 +1680,7 @@ class repository_googledrive extends repository {
                 foreach ($fileids as $fileid) {
                     foreach ($userids as $userid) {
                         $gmail = $this->get_google_authenticated_users_email($userid);
-                        if ($this->edit_capability($cmcontext, $userid)) {
+                        if ($this->writer_capability($cmcontext, $userid)) {
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
@@ -1801,7 +1802,7 @@ class repository_googledrive extends repository {
             $fileids = $this->get_fileids($cmid);
             if ($fileids) {
                 foreach ($fileids as $fileid) {
-                    if ($this->edit_capability($cmcontext, $userid)) {
+                    if ($this->writer_capability($cmcontext, $userid)) {
                         $call = new stdClass();
                         $call->fileid = $fileid;
                         $call->gmail = $gmail;
@@ -1913,7 +1914,7 @@ class repository_googledrive extends repository {
                     foreach ($members as $member) {
                         $userid = $member->userid;
                         $gmail = $this->get_google_authenticated_users_email($userid);
-                        if ($this->edit_capability($cmcontext, $userid)) {
+                        if ($this->writer_capability($cmcontext, $userid)) {
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
@@ -2231,9 +2232,8 @@ class repository_googledrive extends repository {
         }
     }
     
-    // Currently only tests for mod/resource capabilities
-    private function edit_capability($context, $user) {
-        return has_capability('mod/resource:addinstance', $context, $user);
+    private function writer_capability($context, $user) {
+        return has_capability('moodle/course:manageactivities', $context, $user);
     }
     
     // Need to limit batches to 1000 calls - $calls should be checked before calling
