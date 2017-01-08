@@ -679,7 +679,7 @@ class repository_googledrive extends repository {
                 $this->course_updated($event);
                 break;
             case '\core\event\course_content_deleted':
-                //$this->course_content_deleted($event);
+                $this->course_content_deleted($event);
                 break;
             case '\core\event\course_restored':
                 $this->course_restored($event);
@@ -1629,34 +1629,10 @@ class repository_googledrive extends repository {
         }
     }
     
-    // Not working: $userids probably not populating because course enrolments already deleted?
+    // Permission deletes handled by role_unassign; just need to delete records from database.
     private function course_content_deleted($event) {
         global $DB;
         $courseid = $event->courseid;
-        $userids = $this->get_google_authenticated_userids($courseid);
-        $filerecs = $DB->get_records('repository_gdrive_references', array('courseid' => $courseid), '', 'reference');
-        $deletecalls = array();
-        foreach ($filerecs as $filerec) {
-            foreach ($userids as $userid) {
-                $gmail = $this->get_google_authenticated_users_email($userid);
-                $call = new stdClass();
-                $call->fileid = $filerec->reference;
-                $call->gmail = $gmail;
-                $deletecalls[] = $call;
-                        
-                if (count($deletecalls) == 1000) {
-                    $this->batch_delete_permissions($deletecalls);
-                    unset($deletecalls);
-                    $deletecalls = array();
-                }
-            }
-        }
-        
-        // Call any remaining batch requests.
-        if (count($deletecalls) > 0) {
-            $this->batch_delete_permissions($deletecalls);
-        }
-        
         $DB->delete_records('repository_gdrive_references', array('courseid' => $courseid));
     }
     
