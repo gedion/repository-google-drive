@@ -500,7 +500,14 @@ class repository_googledrive extends repository {
      * @return int
      */
     public function supported_returntypes() {
-        return FILE_INTERNAL | FILE_REFERENCE;
+        //return FILE_INTERNAL | FILE_REFERENCE;
+        global $PAGE;
+        $context = $PAGE->context;
+        if ($context->contextlevel == CONTEXT_MODULE) {
+            return FILE_INTERNAL | FILE_REFERENCE;
+        } else {
+            return FILE_INTERNAL;
+        }
     }
 
     /**

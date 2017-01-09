@@ -45,4 +45,3 @@ $string['googleemail'] = 'Email address';
 $string['googleemail_help'] = 'The email address associated with your Google account.';
 $string['eventtokencreated'] = 'User token created';
 $string['eventtokendeleted'] = 'User token deleted';
-
