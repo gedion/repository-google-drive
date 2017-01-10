@@ -500,14 +500,7 @@ class repository_googledrive extends repository {
      * @return int
      */
     public function supported_returntypes() {
-        //return FILE_INTERNAL | FILE_REFERENCE;
-        global $PAGE;
-        $context = $PAGE->context;
-        if ($context->contextlevel == CONTEXT_MODULE) {
-            return FILE_INTERNAL | FILE_REFERENCE;
-        } else {
-            return FILE_INTERNAL;
-        }
+        return FILE_INTERNAL | FILE_REFERENCE;
     }
 
     /**
@@ -692,7 +685,7 @@ class repository_googledrive extends repository {
                 $this->course_restored($event);
                 break;
             case '\tool_recyclebin\event\course_bin_item_restored':
-                //$this->course_bin_item_restored($event);
+                $this->course_bin_item_restored($event);
                 break;
             case '\core\event\course_section_updated':
                 $this->course_section_updated($event);
@@ -1759,9 +1752,88 @@ class repository_googledrive extends repository {
             }
     }
     
+    // New course module is created, but no info on it is stored in event
     private function course_bin_item_restored($event) {
+        // Deal with file permissions.
         global $DB;
-        // New course module is created, but no info on it is stored in event
+        $objectid = $event->objectid;
+        $courseid = $event->courseid;
+        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+        $coursecontext = context_course::instance($courseid);
+        
+        $restoreditem = $event->get_record_snapshot('tool_recyclebin_course', $objectid);
+        $section = $restoreditem->section;
+        $module = $restoreditem->module;
+        $cm = $DB->get_record('course_modules', array('course' => $courseid, 'module' => $module, 'section' => $section), 'id, visible');
+        $cmid = $cm->id;
+        $cmcontext = context_module::instance($cmid);
+        
+        $userids = $this->get_google_authenticated_userids($courseid);
+        $fileids = $this->get_fileids($cmid);
+        $insertcalls = array();
+        
+        if ($fileids) {
+            foreach ($fileids as $fileid) {
+                foreach ($userids as $userid) {
+                    $gmail = $this->get_google_authenticated_users_email($userid);
+                    if ($this->writer_capability($cmcontext, $userid)) {
+                        $call = new stdClass();
+                        $call->fileid = $fileid;
+                        $call->gmail = $gmail;
+                        $call->role = 'writer';
+                        $insertcalls[] = $call;
+                        unset($call);
+                        if (count($insertcalls) == 1000) {
+                            $this->batch_insert_permissions($insertcalls);
+                            unset($insertcalls);
+                            $insertcalls = array();
+                        }
+                    } else {
+                        if ($course->visible == 1) {
+                            // Course is visible, continue checks
+                            if ($cm->visible == 1) {
+                                // Course module is visible, continue checks
+                                rebuild_course_cache($courseid, true);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                $cminfo = $modinfo->get_cm($cmid);
+        
+                                // User can view course module, section, is enrolled in course, and cannot edit module
+                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->writer_capability($cmcontext, $userid)) {
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $call->role = 'reader';
+                                    $insertcalls[] = $call;
+                                    unset($call);
+                                    if (count($insertcalls) == 1000) {
+                                        $this->batch_insert_permissions($insertcalls);
+                                        unset($insertcalls);
+                                        $insertcalls = array();
+                                    }
+                                }
+                                // else user cannot access course module, do nothing
+                            }
+                            // else course module not visible, do nothing
+                        }
+                        // else course not visible, do nothing
+                    }
+                }
+        
+                // Store cmid and reference(s).
+                $newdata = new stdClass();
+                $newdata->courseid = $courseid;
+                $newdata->cmid = $cmid;
+                $newdata->reference = $fileid;
+                $DB->insert_record('repository_gdrive_references', $newdata);
+                unset($newdata);
+            }
+        }
+        
+        if (count($insertcalls) > 0) {
+            $this->batch_insert_permissions($insertcalls);
+        }
     }
     
     private function group_member_added($event) {
