@@ -500,7 +500,13 @@ class repository_googledrive extends repository {
      * @return int
      */
     public function supported_returntypes() {
-        return FILE_INTERNAL | FILE_REFERENCE;
+        global $PAGE;
+        if ($PAGE->bodyid == 'page-mod-resource-mod') {
+            return FILE_INTERNAL | FILE_REFERENCE;
+        } else {
+            return FILE_INTERNAL;
+        }
+        
     }
 
     /**
