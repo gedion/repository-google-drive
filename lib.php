@@ -53,7 +53,13 @@ class repository_googledrive extends repository {
      */
     const CALLBACKURL = '/admin/oauth2callback.php';
 
+    /**
+     * Return file types for repository.
+     *
+     * @var array
+     */
     private static $googlelivedrivetypes = array('document', 'presentation', 'spreadsheet');
+
     /**
      * Constructor.
      *
@@ -265,7 +271,6 @@ class repository_googledrive extends repository {
             'name' => $name
         );
     }
-
 
     /**
      * List the files and folders.
@@ -506,11 +511,10 @@ class repository_googledrive extends repository {
         } else {
             return FILE_INTERNAL;
         }
-        
     }
 
     /**
-     * Repository method to serve the referenced file
+     * Repository method to serve the referenced file.
      *
      * @param stored_file $storedfile the file that contains the reference
      * @param int $lifetime Number of seconds before the file should expire from caches (null means $CFG->filelifetime)
@@ -539,6 +543,14 @@ class repository_googledrive extends repository {
         }
     }
 
+    /**
+     * Repository method to get the document url.
+     *
+     * @param unknown $id
+     * @param string $downloadurl
+     * @throws repository_exception
+     * @return string|unknown
+     */
     private function get_doc_url_by_doc_id($id, $downloadurl=false) {
         $file = $this->service->files->get($id);
         if (isset($file['fileExtension'])) {
@@ -741,16 +753,20 @@ class repository_googledrive extends repository {
         }
             return true;
     }
-    
-    // Check course visibility after category update.
+
+    /**
+     * Check course visibility after category update.
+     *
+     * @param unknown $event
+     */
     private function course_category_updated($event) {
         global $DB;
         $categoryid = $event->objectid;
         $courses = $DB->get_records('course', array('category' => $categoryid), '', 'id, visible');
-    
+
         $insertcalls = array();
         $deletecalls = array();
-    
+
         foreach ($courses as $course) {
             $courseid = $course->id;
             $coursecontext = context_course::instance($courseid);
@@ -788,7 +804,7 @@ class repository_googledrive extends repository {
                                         $sectionnumber = $this->get_cm_sectionnum($cmid);
                                         $secinfo = $modinfo->get_section_info($sectionnumber);
                                         if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                            //  User can view course module, section, is enrolled in course.
+                                            // User can view course module, section, is enrolled in course.
                                             $call = new stdClass();
                                             $call->fileid = $fileid;
                                             $call->gmail = $gmail;
@@ -851,17 +867,22 @@ class repository_googledrive extends repository {
                 }
             }
         }
-    
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-    
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
     }
-    
+
+    /**
+     * Check course visibility after course update.
+     *
+     * @param unknown $event
+     */
     private function course_updated($event) {
         global $DB;
         $courseid = $event->courseid;
@@ -870,10 +891,10 @@ class repository_googledrive extends repository {
         $userids = $this->get_google_authenticated_userids($courseid);
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-    
+
         $insertcalls = array();
         $deletecalls = array();
-    
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -905,7 +926,7 @@ class repository_googledrive extends repository {
                                     $sectionnumber = $this->get_cm_sectionnum($cmid);
                                     $secinfo = $modinfo->get_section_info($sectionnumber);
                                     if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                        //  User can view course module, section, and is enrolled in course.
+                                        // User can view course module, section, and is enrolled in course.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->gmail = $gmail;
@@ -967,24 +988,34 @@ class repository_googledrive extends repository {
                 }
             }
         }
-    
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-    
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
     }
-    
-    // Permission deletes handled by role_unassign; just need to delete records from database.
+
+    /**
+     * Delete Google Drive permissions when course is deleted.
+     * Permission deletes handled by role_unassigned; only need to delete database records here.
+     *
+     * @param unknown $event
+     */
     private function course_content_deleted($event) {
         global $DB;
         $courseid = $event->courseid;
         $DB->delete_records('repository_gdrive_references', array('courseid' => $courseid));
     }
-    
+
+    /**
+     * Insert Google Drive permissions when course is restored.
+     *
+     * @param unknown $event
+     */
     private function course_restored($event) {
         global $DB;
         $courseid = $event->courseid;
@@ -993,10 +1024,10 @@ class repository_googledrive extends repository {
         $userids = $this->get_google_authenticated_userids($courseid);
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-    
+
         $insertcalls = array();
         $deletecalls = array();
-    
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -1028,7 +1059,7 @@ class repository_googledrive extends repository {
                                     $sectionnumber = $this->get_cm_sectionnum($cmid);
                                     $secinfo = $modinfo->get_section_info($sectionnumber);
                                     if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                        //  User can view course module, section, and is enrolled in course.
+                                        // User can view course module, section, and is enrolled in course.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->gmail = $gmail;
@@ -1087,7 +1118,7 @@ class repository_googledrive extends repository {
                             }
                         }
                     }
-    
+
                     $newdata = new stdClass();
                     $newdata->courseid = $courseid;
                     $newdata->cmid = $cmid;
@@ -1095,18 +1126,23 @@ class repository_googledrive extends repository {
                     $DB->insert_record('repository_gdrive_references', $newdata);
                 }
             }
-    
+
             // Call any remaining batch requests.
             if (count($insertcalls) > 0) {
                 $this->batch_insert_permissions($insertcalls);
             }
-    
+
             if (count($deletecalls) > 0) {
                 $this->batch_delete_permissions($deletecalls);
             }
         }
     }
-    
+
+    /**
+     * Check course module visibility and access when section is updated.
+     *
+     * @param unknown $event
+     */
     private function course_section_updated($event) {
         global $DB;
         $courseid = $event->courseid;
@@ -1115,10 +1151,10 @@ class repository_googledrive extends repository {
         $userids = $this->get_google_authenticated_userids($courseid);
         $sectionnumber = $event->other['sectionnum'];
         $cms = $this->get_section_course_modules($sectionnumber);
-    
+
         $insertcalls = array();
         $deletecalls = array();
-    
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -1150,7 +1186,7 @@ class repository_googledrive extends repository {
                                     $sectionnumber = $this->get_cm_sectionnum($cmid);
                                     $secinfo = $modinfo->get_section_info($sectionnumber);
                                     if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                        //  User can view course module, section, and is enrolled in course.
+                                        // User can view course module, section, and is enrolled in course.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->gmail = $gmail;
@@ -1212,32 +1248,36 @@ class repository_googledrive extends repository {
                 }
             }
         }
-    
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-    
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
-    
     }
 
+    /**
+     * Insert Google Drive permissions when file resource course module created.
+     *
+     * @param unknown $event
+     */
     private function course_module_created($event) {
         global $DB;
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
-    
+
         $cmid = $event->contextinstanceid;
         $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
         $cmcontext = context_module::instance($cmid);
-    
+
         $userids = $this->get_google_authenticated_userids($courseid);
         $fileids = $this->get_fileids($cmid);
         $insertcalls = array();
-    
+
         if ($fileids) {
             foreach ($fileids as $fileid) {
                 foreach ($userids as $userid) {
@@ -1264,7 +1304,7 @@ class repository_googledrive extends repository {
                                 $modinfo = get_fast_modinfo($courseid, $userid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 $cminfo = $modinfo->get_cm($cmid);
-    
+
                                 // User can view course module, section, and is enrolled in course.
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->writer_capability($cmcontext, $userid)) {
                                     $call = new stdClass();
@@ -1279,14 +1319,14 @@ class repository_googledrive extends repository {
                                         $insertcalls = array();
                                     }
                                 }
-                                // else user cannot access course module, do nothing.
+                                // User cannot access course module, do nothing.
                             }
-                            // else course module not visible, do nothing.
+                            // Course module not visible, do nothing.
                         }
-                        // else course not visible, do nothing.
+                        // Course not visible, do nothing.
                     }
                 }
-    
+
                 // Store cmid and reference(s).
                 $newdata = new stdClass();
                 $newdata->courseid = $courseid;
@@ -1296,31 +1336,36 @@ class repository_googledrive extends repository {
                 unset($newdata);
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
     }
-    
+
+    /**
+     * Check course module visibility and access when file resource is updated.
+     *
+     * @param unknown $event
+     */
     private function course_module_updated($event) {
         global $DB;
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
-        
+
         $cmid = $event->contextinstanceid;
         $cm = $DB->get_record('course_modules', array('id' => $cmid), 'visible');
         $cmcontext = context_module::instance($cmid);
-        
+
         $userids = $this->get_google_authenticated_userids($courseid);
-        
+
         // Get current file ids for module.
         $fileids = $this->get_fileids($cmid);
-        
+
         $insertcalls = array();
         $deletecalls = array();
-        
+
         // Check and ajust permissions for current file ids for module.
         if ($fileids) {
             foreach ($fileids as $fileid) {
@@ -1348,7 +1393,7 @@ class repository_googledrive extends repository {
                                 $modinfo = get_fast_modinfo($courseid, $userid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 $cminfo = $modinfo->get_cm($cmid);
-            
+
                                 // User can view course module, section, and is enrolled in course.
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->writer_capability($cmcontext, $userid)) {
                                     $call = new stdClass();
@@ -1411,18 +1456,18 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Get previous file ids for module.
         $prevfilerecs = $DB->get_records('repository_gdrive_references', array('cmid' => $cmid), '', 'reference');
         $prevfileids = array();
         foreach ($prevfilerecs as $prevfilerec) {
             $prevfileids[] = $prevfilerec->reference;
         }
-        
+
         // Get file ids that were added and deleted from module.
         $addfileids = array_diff($fileids, $prevfileids);
         $delfileids = array_diff($prevfileids, $fileids);
-        
+
         // Delete permissions and database records for removed file ids.
         foreach ($delfileids as $delfileid) {
             foreach ($userids as $userid) {
@@ -1442,28 +1487,33 @@ class repository_googledrive extends repository {
             }
             $DB->delete_records_select('repository_gdrive_references', 'cmid = :cmid AND reference = :reference', array('cmid' => $cmid, 'reference' => $delfileid));
         }
-        
+
         // Call any remainting batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-        
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
-        
+
         // Add new file ids to database.
         $newdata = new stdClass();
         $newdata->courseid = $courseid;
         $newdata->cmid = $cmid;
-        
+
         foreach ($addfileids as $addfileid) {
             $newdata->reference = $addfileid;
             $DB->insert_record('repository_gdrive_references', $newdata);
             unset($newdata);
         }
     }
-    
+
+    /**
+     * Delete Google Drive permissions when file resource course module is deleted.
+     *
+     * @param unknown $event
+     */
     private function course_module_deleted($event) {
         global $DB;
         $courseid = $event->courseid;
@@ -1480,7 +1530,7 @@ class repository_googledrive extends repository {
                 $permissionidcall = $this->service->permissions->getIdForEmail($gmail);
                 $call->permissionid = $permissionidcall->id;
                 $deletecalls[] = $call;
-        
+
                 if (count($deletecalls) == 1000) {
                     $this->batch_delete_permissions($deletecalls);
                     unset($deletecalls);
@@ -1488,26 +1538,31 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
-        
+
         $DB->delete_records('repository_gdrive_references', array('cmid' => $cmid));
     }
-    
+
+    /**
+     * Insert permissions when a file resource course module is restored from recycle bin.
+     *
+     * @param unknown $event
+     */
     private function course_bin_item_restored($event) {
         global $DB;
         $objectid = $event->objectid;
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
-    
+
         $restoreditem = $event->get_record_snapshot('tool_recyclebin_course', $objectid);
         $section = $restoreditem->section;
         $module = $restoreditem->module;
-        
+
         $sql = 'SELECT id, visible
                 FROM {course_modules}
                 WHERE course = :courseid
@@ -1518,11 +1573,11 @@ class repository_googledrive extends repository {
         $cm = $DB->get_record_sql($sql, array('courseid' => $courseid, 'module' => $module, 'section' => $section));
         $cmid = $cm->id;
         $cmcontext = context_module::instance($cmid);
-    
+
         $userids = $this->get_google_authenticated_userids($courseid);
         $fileids = $this->get_fileids($cmid);
         $insertcalls = array();
-    
+
         if ($fileids) {
             foreach ($fileids as $fileid) {
                 foreach ($userids as $userid) {
@@ -1549,7 +1604,7 @@ class repository_googledrive extends repository {
                                 $modinfo = get_fast_modinfo($courseid, $userid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 $cminfo = $modinfo->get_cm($cmid);
-    
+
                                 // User can view course module, section, and is enrolled in course.
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true) && !$this->writer_capability($cmcontext, $userid)) {
                                     $call = new stdClass();
@@ -1564,14 +1619,14 @@ class repository_googledrive extends repository {
                                         $insertcalls = array();
                                     }
                                 }
-                                // else user cannot access course module, do nothing.
+                                // User cannot access course module, do nothing.
                             }
-                            // else course module not visible, do nothing.
+                            // Course module not visible, do nothing.
                         }
-                        // else course not visible, do nothing.
+                        // Course not visible, do nothing.
                     }
                 }
-    
+
                 // Store cmid and reference(s).
                 $newdata = new stdClass();
                 $newdata->courseid = $courseid;
@@ -1581,27 +1636,32 @@ class repository_googledrive extends repository {
                 unset($newdata);
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
     }
-    
+
+    /**
+     * Insert or delete Google Drive permissions when role assigned to a user.
+     *
+     * @param unknown $event
+     */
     private function role_assigned($event) {
         global $DB;
         $userid = $event->relateduserid;
         $gmail = $this->get_google_authenticated_users_email($userid);
-        
+
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-        
+
         $insertcalls = array();
         $deletecalls = array();
-        
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -1631,7 +1691,7 @@ class repository_googledrive extends repository {
                                 $sectionnumber = $this->get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    //  User can view course module, section, and is enrolled in course.
+                                    // User can view course module, section, and is enrolled in course.
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $gmail;
@@ -1692,17 +1752,23 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-        
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
     }
-    
+
+    /**
+     * Patch Google Drive permissions when role is unassigned from user.
+     * Also used during course_content_deleted event.
+     *
+     * @param unknown $event
+     */
     private function role_unassigned($event) {
         global $DB;
         $userid = $event->relateduserid;
@@ -1710,7 +1776,7 @@ class repository_googledrive extends repository {
         $courseid = $event->courseid;
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-        
+
         $patchcalls = array();
 
         foreach ($cms as $cm) {
@@ -1737,40 +1803,45 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($patchcalls) > 0) {
             $this->batch_patch_permissions($patchcalls);
         }
     }
-    
+
+    /**
+     * Insert, delete or patch Google Drive permissions when role capabilities are updated.
+     *
+     * @param unknown $event
+     */
     private function role_capabilities_updated($event) {
         global $DB;
         $roleid = $event->objectid;
-        $sql = "SELECT DISTINCT c.id, c.visible 
-                FROM {course} c 
+        $sql = "SELECT DISTINCT c.id, c.visible
+                FROM {course} c
                 LEFT JOIN {context} ct
-                ON c.id = ct.instanceid 
-                LEFT JOIN {role_assignments} ra 
-                ON ra.contextid = ct.id 
+                ON c.id = ct.instanceid
+                LEFT JOIN {role_assignments} ra
+                ON ra.contextid = ct.id
                 WHERE ra.roleid = :roleid";
-        
+
         // Get courses affected by role capability update.
         $courses = $DB->get_records_sql($sql, array('roleid' => $roleid));
-        
+
         // Get userids affected by role capability update.
         $users = $DB->get_records('role_assignments', array('roleid' => $roleid), '', 'id, userid');
-        
+
         $insertcalls = array();
         $deletecalls = array();
         $patchcalls = array();
-        
+
         foreach ($courses as $course) {
             $courseid = $course->id;
             $coursecontext = context_course::instance($courseid);
             $coursemodinfo = get_fast_modinfo($courseid, -1);
             $cms = $coursemodinfo->get_cms();
-            
+
             foreach ($cms as $cm) {
                 $cmid = $cm->id;
                 $cmcontext = context_module::instance($cmid);
@@ -1809,7 +1880,7 @@ class repository_googledrive extends repository {
                                     $patchcalls = array();
                                 }
                             }
-                            
+
                             // If view, insert ‘reader’ permission.
                             // Else if !view, delete permission.
                             if ($course->visible == 1) {
@@ -1822,7 +1893,7 @@ class repository_googledrive extends repository {
                                     $sectionnumber = $this->get_cm_sectionnum($cmid);
                                     $secinfo = $modinfo->get_section_info($sectionnumber);
                                     if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                        //  User can view course module, section, and is enrolled in course.
+                                        // User can view course module, section, and is enrolled in course.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->gmail = $gmail;
@@ -1884,21 +1955,26 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-        
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
-        
+
         if (count($patchcalls) > 0) {
             $this->batch_patch_permissions($patchcalls);
         }
     }
-    
+
+    /**
+     * Insert or delete Google Drive permissions when user is added to group.
+     *
+     * @param unknown $event
+     */
     private function group_member_added($event) {
         global $DB;
         $groupid = $event->objectid;
@@ -1910,10 +1986,10 @@ class repository_googledrive extends repository {
         $coursecontext = context_course::instance($courseid);
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-        
+
         $insertcalls = array();
         $deletecalls = array();
-        
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -1943,7 +2019,7 @@ class repository_googledrive extends repository {
                                 $sectionnumber = $this->get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    //  User can view course module, section, and is enrolled in course.
+                                    // User can view course module, section, and is enrolled in course.
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $gmail;
@@ -2004,17 +2080,22 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-        
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
     }
-    
+
+    /**
+     * Insert or delete Google Drive permissions when a group is assigned to a grouping.
+     *
+     * @param unknown $event
+     */
     private function grouping_group_assigned($event) {
         global $DB;
         $groupid = $event->other['groupid'];
@@ -2025,10 +2106,10 @@ class repository_googledrive extends repository {
         $coursecontext = context_course::instance($courseid);
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-        
+
         $insertcalls = array();
         $deletecalls = array();
-        
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -2061,7 +2142,7 @@ class repository_googledrive extends repository {
                                     $sectionnumber = $this->get_cm_sectionnum($cmid);
                                     $secinfo = $modinfo->get_section_info($sectionnumber);
                                     if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                        //  User can view course module, section, and is enrolled in course.
+                                        // User can view course module, section, and is enrolled in course.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->gmail = $gmail;
@@ -2123,18 +2204,23 @@ class repository_googledrive extends repository {
                 }
             }
         }
-        
+
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
         }
-        
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
     }
-    
-    // Don't worry about reader/writer here - role assigned after user enroled.
+
+    /**
+     * Insert Google Drive permissions when user is enroled in course.
+     * Don't worry about reader/writer here - role_assigned handles after user enroled.
+     *
+     * @param unknown $event
+     */
     private function user_enrolment_created($event) {
         global $DB;
         $courseid = $event->courseid;
@@ -2145,10 +2231,9 @@ class repository_googledrive extends repository {
             $coursecontext = context_course::instance($courseid);
             $coursemodinfo = get_fast_modinfo($courseid, -1);
             $cms = $coursemodinfo->get_cms();
-            
+
             $insertcalls = array();
-            $deletecalls = array();
-            
+
             foreach ($cms as $cm) {
                 $cmid = $cm->id;
                 $cmcontext = context_module::instance($cmid);
@@ -2165,7 +2250,7 @@ class repository_googledrive extends repository {
                                 $sectionnumber = $this->get_cm_sectionnum($cmid);
                                 $secinfo = $modinfo->get_section_info($sectionnumber);
                                 if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    //  User can view course module, section, and is enrolled in course.
+                                    // User can view course module, section, and is enrolled in course.
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $gmail;
@@ -2177,66 +2262,28 @@ class repository_googledrive extends repository {
                                         unset($insertcalls);
                                         $insertcalls = array();
                                     }
-                                } else {
-                                    // User cannot view course module, or section, or is not enrolled in course; delete permissions.
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->gmail = $gmail;
-                                    $permissionidcall = $this->service->permissions->getIdForEmail($gmail);
-                                    $call->permissionid = $permissionidcall->id;
-                                    $deletecalls[] = $call;
-                                    unset($call);
-                                    if (count($deletecalls) == 1000) {
-                                        $this->batch_delete_permissions($deletecalls);
-                                        unset($deletecalls);
-                                        $deletecalls = array();
-                                    }
                                 }
-                            } else {
-                                // Course module is not visible, delete permissions.
-                                $call = new stdClass();
-                                $call->fileid = $fileid;
-                                $call->gmail = $gmail;
-                                $permissionidcall = $this->service->permissions->getIdForEmail($gmail);
-                                $call->permissionid = $permissionidcall->id;
-                                $deletecalls[] = $call;
-                                unset($call);
-                                if (count($deletecalls) == 1000) {
-                                    $this->batch_delete_permissions($deletecalls);
-                                    unset($deletecalls);
-                                    $deletecalls = array();
-                                }
+                                // Course module is not accessible, do nothing.
                             }
-                        } else {
-                            // Course is not visible, delete permissions.
-                            $call = new stdClass();
-                            $call->fileid = $fileid;
-                            $call->gmail = $gmail;
-                            $permissionidcall = $this->service->permissions->getIdForEmail($gmail);
-                            $call->permissionid = $permissionidcall->id;
-                            $deletecalls[] = $call;
-                            unset($call);
-                            if (count($deletecalls) == 1000) {
-                                $this->batch_delete_permissions($deletecalls);
-                                unset($deletecalls);
-                                $deletecalls = array();
-                            }
+                            // Course module is not visible, do nothing.
                         }
+                        // Course is not visible, do nothing.
                     }
                 }
             }
-            
+
             // Call any remaining batch requests.
             if (count($insertcalls) > 0) {
                 $this->batch_insert_permissions($insertcalls);
             }
-            
-            if (count($deletecalls) > 0) {
-                $this->batch_delete_permissions($deletecalls);
-            }
-        }   
+        }
     }
-    
+
+    /**
+     * Delete Google Drive permissions when user enrolment deleted.
+     *
+     * @param unknown $event
+     */
     private function user_enrolment_deleted($event) {
         global $DB;
         $courseid = $event->courseid;
@@ -2253,23 +2300,28 @@ class repository_googledrive extends repository {
                     $permissionidcall = $this->service->permissions->getIdForEmail($gmail);
                     $call->permissionid = $permissionidcall->id;
                     $deletecalls[] = $call;
-                    
+
                     if (count($deletecalls) == 1000) {
                         $this->batch_delete_permissions($deletecalls);
                         unset($deletecalls);
                         $deletecalls = array();
                     }
                 }
-            }  
+            }
         }
-        
+
         // Call any remaining batch requests.
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
     }
-    
-    // Role or enrol event handles permissions.
+
+    /**
+     * Delete database records when user deleted.
+     * Don't worry about Google Drive permissions - role_assigned handles.
+     *
+     * @param unknown $event
+     */
     private function user_deleted($event) {
         global $DB;
         $userid = $event->relateduserid;
@@ -2277,7 +2329,7 @@ class repository_googledrive extends repository {
         $this->client->revokeToken($token->refreshtokenid);
         $DB->delete_records('repository_gdrive_tokens', array ('userid' => $userid));
     }
-    
+
     /**
      * Get userids for users in specified course.
      *
@@ -2335,8 +2387,13 @@ class repository_googledrive extends repository {
         $section = $DB->get_record_sql($sql, array('cmid' => $cmid));
         return $section->section;
     }
-    
-    // Only gets file ids for course module file references.
+
+    /**
+     * Get file ids for file resource course modules.
+     *
+     * @param unknown $cmid
+     * @return void|NULL[]|boolean
+     */
     private function get_fileids($cmid) {
         global $DB;
         $googledriverepo = $DB->get_record('repository', array ('type' => 'googledrive'), 'id');
@@ -2345,7 +2402,7 @@ class repository_googledrive extends repository {
             debugging('Could not find any instance of the repository');
             return;
         }
-    
+
         $sql = "SELECT DISTINCT r.reference
                 FROM {files_reference} r
                 LEFT JOIN {files} f
@@ -2358,11 +2415,11 @@ class repository_googledrive extends repository {
                 AND r.repositoryid = :repoid
                 AND f.referencefileid IS NOT NULL
                 AND NOT (f.component = :component1 AND f.component = :component2 AND f.filearea = :filearea)";
-        
+
         // Try to get file reference ids from Moodle files reference table.
         $filerecords = $DB->get_records_sql($sql,
                 array('component1' => 'user', 'component2' => 'tool_recyclebin', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
-    
+
         if ($filerecords) {
             $fileids = array();
             foreach ($filerecords as $filerecord) {
@@ -2379,22 +2436,35 @@ class repository_googledrive extends repository {
             }
             return $fileids;
         }
-        
+
         return false;
     }
-    
+
+    /**
+     * Verify that user has manageactivities capability.
+     * Used to determine writer Google Drive permissions.
+     *
+     * @param unknown $context
+     * @param unknown $user
+     * @return boolean
+     */
     private function writer_capability($context, $user) {
         return has_capability('moodle/course:manageactivities', $context, $user);
     }
-    
-    // Need to limit batches to 1000 calls - $calls should be checked before calling
+
+    /**
+     * Batch insert Google Drive permissions.
+     * Batches must be limited to 1000 calls - calling function should handle check.
+     *
+     * @param unknown $calls
+     */
     private function batch_insert_permissions($calls) {
         $type = 'user';
         $optparams = array('sendNotificationEmails' => false);
         $this->client->setUseBatch(true);
         try {
             $batch = $this->service->createBatch();
-            
+
             foreach ($calls as $call) {
                 $name = explode('@', $call->gmail);
                 $newpermission = new Google_Service_Drive_Permission();
@@ -2404,13 +2474,13 @@ class repository_googledrive extends repository {
                 $newpermission->setEmailAddress($call->gmail);
                 $newpermission->setDomain($name[1]);
                 $newpermission->setName($name[0]);
-                
+
                 $request = $this->service->permissions->insert($call->fileid, $newpermission, $optparams);
                 $batch->add($request);
             }
-            
+
             $results = $batch->execute();
-            
+
             foreach ($results as $result) {
                 if ($result instanceof Google_Service_Exception) {
                     debugging($result);
@@ -2420,20 +2490,25 @@ class repository_googledrive extends repository {
             $this->client->setUseBatch(false);
         }
     }
-    
-    // Need to limit batches to 1000 calls - $calls should be checked before calling
+
+    /**
+     * Batch delete Google Drive permissions.
+     * Batches must be limited to 1000 calls - calling function should handle check.
+     *
+     * @param unknown $calls
+     */
     private function batch_delete_permissions($calls) {
         $this->client->setUseBatch(true);
         try {
             $batch = $this->service->createBatch();
-            
+
             foreach ($calls as $call) {
                 $request = $this->service->permissions->delete($call->fileid, $call->permissionid);
                 $batch->add($request);
             }
-    
+
             $results = $batch->execute();
-    
+
             foreach ($results as $result) {
                 if ($result instanceof Google_Service_Exception) {
                     debugging($result);
@@ -2443,22 +2518,27 @@ class repository_googledrive extends repository {
             $this->client->setUseBatch(false);
         }
     }
-    
-    // Need to limit batches to 1000 calls - $calls should be checked before calling
+
+    /**
+     * Batch patch Google Drive permissions.
+     * Batches must be limited to 1000 calls - calling function should handle check.
+     *
+     * @param unknown $calls
+     */
     private function batch_patch_permissions($calls) {
         $this->client->setUseBatch(true);
         try {
             $batch = $this->service->createBatch();
-            
+
             foreach ($calls as $call) {
                 $patchedpermission = new Google_Service_Drive_Permission();
                 $patchedpermission->setRole($call->role);
                 $request = $this->service->permissions->patch($call->fileid, $call->permissionid, $patchedpermission);
                 $batch->add($request);
             }
-        
+
             $results = $batch->execute();
-        
+
             foreach ($results as $result) {
                 if ($result instanceof Google_Service_Exception) {
                     debugging($result);
