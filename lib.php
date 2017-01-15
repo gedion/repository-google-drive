@@ -2416,20 +2416,10 @@ class repository_googledrive extends repository {
                 AND f.referencefileid IS NOT NULL
                 AND NOT (f.component = :component1 AND f.component = :component2 AND f.filearea = :filearea)";
 
-        // Try to get file reference ids from Moodle files reference table.
         $filerecords = $DB->get_records_sql($sql,
                 array('component1' => 'user', 'component2' => 'tool_recyclebin', 'filearea' => 'draft', 'repoid' => $id, 'cmid' => $cmid));
 
         if ($filerecords) {
-            $fileids = array();
-            foreach ($filerecords as $filerecord) {
-                $fileids[] = $filerecord->reference;
-            }
-            return $fileids;
-        } else {
-            // Try to get file reference ids from repo reference table.
-            unset($filerecords);
-            $filerecords = $DB->get_records('repository_gdrive_references', array('cmid' => $cmid), '', 'id, reference');
             $fileids = array();
             foreach ($filerecords as $filerecord) {
                 $fileids[] = $filerecord->reference;
