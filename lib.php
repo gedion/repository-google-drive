@@ -1625,23 +1625,19 @@ class repository_googledrive extends repository {
                         $call->fileid = $filerec->reference;
                         $call->permissionid = $permissionid->id;
                         $deletecalls[] = $call;
-                    }
-                    
-                    if (count($deletecalls) == 1000) {
-                        $this->batch_delete_permissions($deletecalls);
-                        unset($deletecalls);
-                        $deletecalls = array();
+                        if (count($deletecalls) == 1000) {
+                            $this->batch_delete_permissions($deletecalls);
+                            unset($deletecalls);
+                            $deletecalls = array();
+                        }
                     }
                 } catch (Exception $e) {
                     debugging($e);
                 }
-
-                unset($user);
             }
             foreach ($siteadmins as $siteadmin) {
-                $gmail = $this->get_google_authenticated_users_email($siteadmin);
                 try {
-                    $permissionid = $this->service->permissions->getIdForEmail($gmail);
+                    $permissionid = $this->service->permissions->getIdForEmail($siteadmin->gmail);
                     $permission = $this->service->permissions->get($filerec->reference, $permissionid->id);
                     if ($permission->role != 'owner') {
                         $call = new stdClass();
@@ -1655,19 +1651,14 @@ class repository_googledrive extends repository {
                         }
                     }
                 } catch (Exception $e) {
-                    debugging($e);                }
-                
-                unset($siteadmin);
+                    debugging($e);                
+                }
             }
-            
-            unset($filerec);
         }
-
         // Call any remaining batch requests.
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
-
         $DB->delete_records('repository_gdrive_references', array('cmid' => $cmid));
     }
 
