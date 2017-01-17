@@ -1610,31 +1610,40 @@ class repository_googledrive extends repository {
     private function course_module_deleted($event) {
         global $DB;
         $courseid = $event->courseid;
+        $coursecontext = context_course::instance($courseid);
         $cmid = $event->contextinstanceid;
-        $siteadmins = $this->get_siteadmins();
+        //$siteadmins = $this->get_siteadmins();
         $users = $this->get_google_authenticated_users($courseid);
         $filerecs = $DB->get_records('repository_gdrive_references', array('cmid' => $cmid), '', 'reference');
         $deletecalls = array();
         foreach ($filerecs as $filerec) {
             foreach ($users as $user) {
-                try {
-                    $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
-                    $permission = $this->service->permissions->get($filerec->reference, $permissionid->id);
-                    if ($permission->role != 'owner') {
-                        $call = new stdClass();
-                        $call->fileid = $filerec->reference;
-                        $call->permissionid = $permissionid->id;
-                        $deletecalls[] = $call;
-                        if (count($deletecalls) == 1000) {
-                            $this->batch_delete_permissions($deletecalls);
-                            unset($deletecalls);
-                            $deletecalls = array();
+                if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
+                    // Manager; do nothing (don't delete permissions so they can restore if necessary).
+                } elseif (is_enrolled($coursecontext, $user->userid, null, true) && has_capability('moodle/course:manageactivities', $coursecontext, $user->userid)) {
+                    // Enrolled teacher; do nothing (don't delete permissions so they can restore if necessary).
+                } else {
+                    // Student; delete permissions
+                    try {
+                        $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
+                        $permission = $this->service->permissions->get($filerec->reference, $permissionid->id);
+                        if ($permission->role != 'owner') {
+                            $call = new stdClass();
+                            $call->fileid = $filerec->reference;
+                            $call->permissionid = $permissionid->id;
+                            $deletecalls[] = $call;
+                            if (count($deletecalls) == 1000) {
+                                $this->batch_delete_permissions($deletecalls);
+                                //unset($deletecalls);
+                                $deletecalls = array();
+                            }
                         }
+                    } catch (Exception $e) {
+                        debugging($e);
                     }
-                } catch (Exception $e) {
-                    debugging($e);
-                }
+                }   
             }
+            /*
             foreach ($siteadmins as $siteadmin) {
                 try {
                     $permissionid = $this->service->permissions->getIdForEmail($siteadmin->gmail);
@@ -1654,6 +1663,7 @@ class repository_googledrive extends repository {
                     debugging($e);                
                 }
             }
+            */
         }
         // Call any remaining batch requests.
         if (count($deletecalls) > 0) {
