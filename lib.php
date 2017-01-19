@@ -694,7 +694,7 @@ class repository_googledrive extends repository {
                 $this->course_category_updated($event);
                 break;
             case '\core\event\course_updated':
-                //$this->course_updated($event);
+                $this->course_updated($event);
                 break;
             case '\core\event\course_content_deleted':
                 //$this->course_content_deleted($event);
@@ -920,121 +920,128 @@ class repository_googledrive extends repository {
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
-        $userids = $this->get_google_authenticated_userids($courseid);
+        $users = $this->get_google_authenticated_users($courseid);
         $coursemodinfo = get_fast_modinfo($courseid, -1);
         $cms = $coursemodinfo->get_cms();
-
         $insertcalls = array();
         $deletecalls = array();
-
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
             $fileids = $this->get_fileids($cmid);
             if ($fileids) {
                 foreach ($fileids as $fileid) {
-                    foreach ($userids as $userid) {
-                        $gmail = $this->get_google_authenticated_users_email($userid);
-                        if (!$this->writer_capability($cmcontext, $userid)) {
+                    foreach ($users as $user) {
+                        if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
+                            // Manager; do nothing.
+                        } elseif (is_enrolled($coursecontext, $user->userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $user->userid)) {
+                            // Teacher, enrolled; insert writer permission.
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $user->gmail;
+                            $call->role = 'writer';
+                            $insertcalls[] = $call;
+                            if (count($insertcalls) == 1000) {
+                                $this->batch_insert_permissions($insertcalls);
+                                $insertcalls = array();
+                            }
+                        } elseif (is_enrolled($coursecontext, $user->userid, null, true)) {
+                            // Student, enrolled, continue checks for reader permissions.
                             if ($course->visible == 1) {
                                 // Course is visible, continue checks.
                                 if ($cm->visible == 1) {
                                     // Course module is visible, continue checks.
                                     rebuild_course_cache($courseid, true);
-                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $modinfo = get_fast_modinfo($courseid, $user->userid);
                                     $cminfo = $modinfo->get_cm($cmid);
-                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                    $secinfo = $modinfo->get_section_info($sectionnumber);
-                                    if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                        // User can view course module, section, and is enrolled in course.
+                                    if ($cminfo->uservisible) {
+                                        // User can view course module; insert reader permission.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
-                                        $call->gmail = $gmail;
+                                        $call->gmail = $user->gmail;
                                         $call->role = 'reader';
                                         $insertcalls[] = $call;
-                                        unset($call);
                                         if (count($insertcalls) == 1000) {
                                             $this->batch_insert_permissions($insertcalls);
-                                            unset($insertcalls);
                                             $insertcalls = array();
                                         }
                                     } else {
-                                        // User cannot view course module, or section, or is not enrolled in course; delete permissions.
-                                        $permissionid = $this->service->permissions->getIdForEmail($gmail);
-                                        if ($permissionid instanceof Google_Service_Exception) {
-                                            debugging($permissionid);
+                                        // User cannot access course module, delete permission.
+                                        try {
+                                            $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
+                                            $permission = $this->service->permissions->get($fileid, $permissionid->id);
+                                            if ($permission->role != 'owner') {
+                                                $call = new stdClass();
+                                                $call->fileid = $fileid;
+                                                $call->permissionid = $permissionid->id;
+                                                $deletecalls[] = $call;
+                                                if (count($deletecalls) == 1000) {
+                                                    $this->batch_delete_permissions($deletecalls);
+                                                    $deletecalls = array();
+                                                }
+                                            }
+                                        } catch (Exception $e) {
+                                            debugging($e);
                                         }
-                            
+                                    }
+        
+                                } else {
+                                    // Course module not visible, delete permission.
+                                    try {
+                                        $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
                                         $permission = $this->service->permissions->get($fileid, $permissionid->id);
-                                        if ($permission instanceof Google_Service_Exception) {
-                                            debugging($permission);
-                                        }
-                            
-                                        if ($permission->role != 'owner' && !$permissionid instanceof Google_Service_Exception && !$permission instanceof Google_Service_Exception) {
+                                        if ($permission->role != 'owner') {
                                             $call = new stdClass();
                                             $call->fileid = $fileid;
                                             $call->permissionid = $permissionid->id;
                                             $deletecalls[] = $call;
-                                            unset($call);
+                                            if (count($deletecalls) == 1000) {
+                                                $this->batch_delete_permissions($deletecalls);
+                                                $deletecalls = array();
+                                            }
                                         }
-                            
-                                        if (count($deletecalls) == 1000) {
-                                            $this->batch_delete_permissions($deletecalls);
-                                            unset($deletecalls);
-                                            $deletecalls = array();
-                                        }
+                                    } catch (Exception $e) {
+                                        debugging($e);
                                     }
-                                } else {
-                                    // Course module is not visible, delete permissions.
-                                    $permissionid = $this->service->permissions->getIdForEmail($gmail);
-                                    if ($permissionid instanceof Google_Service_Exception) {
-                                        debugging($permissionid);
-                                    }
-                            
+                                }
+        
+                            } else {
+                                // Course not visible, delete permission.
+                                try {
+                                    $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
                                     $permission = $this->service->permissions->get($fileid, $permissionid->id);
-                                    if ($permission instanceof Google_Service_Exception) {
-                                        debugging($permission);
-                                    }
-                            
-                                    if ($permission->role != 'owner' && !$permissionid instanceof Google_Service_Exception && !$permission instanceof Google_Service_Exception) {
+                                    if ($permission->role != 'owner') {
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->permissionid = $permissionid->id;
                                         $deletecalls[] = $call;
-                                        unset($call);
+                                        if (count($deletecalls) == 1000) {
+                                            $this->batch_delete_permissions($deletecalls);
+                                            $deletecalls = array();
+                                        }
                                     }
-                            
-                                    if (count($deletecalls) == 1000) {
-                                        $this->batch_delete_permissions($deletecalls);
-                                        unset($deletecalls);
-                                        $deletecalls = array();
-                                    }
+                                } catch (Exception $e) {
+                                    debugging($e);
                                 }
-                            } else {
-                                // Course is not visible, delete permissions.
-                                $permissionid = $this->service->permissions->getIdForEmail($gmail);
-                                if ($permissionid instanceof Google_Service_Exception) {
-                                    debugging($permissionid);
-                                }
-                            
+                            }
+        
+                        } else {
+                            // User is not enrolled; delete permission.
+                            try {
+                                $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
                                 $permission = $this->service->permissions->get($fileid, $permissionid->id);
-                                if ($permission instanceof Google_Service_Exception) {
-                                    debugging($permission);
-                                }
-                            
-                                if ($permission->role != 'owner' && !$permissionid instanceof Google_Service_Exception && !$permission instanceof Google_Service_Exception) {
+                                if ($permission->role != 'owner') {
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->permissionid = $permissionid->id;
                                     $deletecalls[] = $call;
-                                    unset($call);
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        $deletecalls = array();
+                                    }
                                 }
-                            
-                                if (count($deletecalls) == 1000) {
-                                    $this->batch_delete_permissions($deletecalls);
-                                    unset($deletecalls);
-                                    $deletecalls = array();
-                                }
+                            } catch (Exception $e) {
+                                debugging($e);
                             }
                         }
                     }
