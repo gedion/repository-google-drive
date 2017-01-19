@@ -804,8 +804,10 @@ class repository_googledrive extends repository {
                                         rebuild_course_cache($courseid, true);
                                         $modinfo = get_fast_modinfo($courseid, $user->userid);
                                         $cminfo = $modinfo->get_cm($cmid);
-                                        if ($cminfo->uservisible) {
-                                            // User can view course module; insert reader permission.
+                                        $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                        $secinfo = $modinfo->get_section_info($sectionnumber);
+                                        if ($cminfo->uservisible && $secinfo->available) {
+                                            // User can view and access course module and can access section; insert reader permission.
                                             $call = new stdClass();
                                             $call->fileid = $fileid;
                                             $call->gmail = $user->gmail;
@@ -954,8 +956,10 @@ class repository_googledrive extends repository {
                                     rebuild_course_cache($courseid, true);
                                     $modinfo = get_fast_modinfo($courseid, $user->userid);
                                     $cminfo = $modinfo->get_cm($cmid);
-                                    if ($cminfo->uservisible) {
-                                        // User can view course module; insert reader permission.
+                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    if ($cminfo->uservisible && $secinfo->available) {
+                                        // User can view and access course module and can access section; insert reader permission.
                                         $call = new stdClass();
                                         $call->fileid = $fileid;
                                         $call->gmail = $user->gmail;
@@ -1369,8 +1373,10 @@ class repository_googledrive extends repository {
                                 rebuild_course_cache($courseid, true);
                                 $modinfo = get_fast_modinfo($courseid, $user->userid);
                                 $cminfo = $modinfo->get_cm($cmid);
-                                if ($cminfo->uservisible) {
-                                    // User can view course module; insert reader permission.
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available) {
+                                    // User can view and access course module and can access section; insert reader permission.
                                     $call = new stdClass();
                                     $call->fileid = $fileid;
                                     $call->gmail = $user->gmail;
@@ -1466,8 +1472,10 @@ class repository_googledrive extends repository {
                                 rebuild_course_cache($courseid, true);
                                 $modinfo = get_fast_modinfo($courseid, $user->userid);
                                 $cminfo = $modinfo->get_cm($cmid);
-                                if ($cminfo->uservisible) {
-                                    // Course module is accessible; insert reader permission.
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available) {
+                                    // User can view and access course module and can access section; insert reader permission.
                                     $call = new stdClass();
                                     $call->fileid = $eqfileid;
                                     $call->gmail = $user->gmail;
@@ -1561,8 +1569,10 @@ class repository_googledrive extends repository {
                                 rebuild_course_cache($courseid, true);
                                 $modinfo = get_fast_modinfo($courseid, $user->userid);
                                 $cminfo = $modinfo->get_cm($cmid);
-                                if ($cminfo->uservisible) {
-                                    // Course module is accessible; insert reader permission.
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available) {
+                                    // User can view and access course module and can access section; insert reader permission.
                                     $call = new stdClass();
                                     $call->fileid = $addfileid;
                                     $call->gmail = $user->gmail;
