@@ -1516,17 +1516,19 @@ class repository_googledrive extends repository {
         $courseid = $event->courseid;
         $coursecontext = context_course::instance($courseid);
         $cmid = $event->contextinstanceid;
+        
         $users = $this->get_google_authenticated_users($courseid);
         $filerecs = $DB->get_records('repository_gdrive_references', array('cmid' => $cmid), '', 'reference');
         $deletecalls = array();
+
         foreach ($filerecs as $filerec) {
             foreach ($users as $user) {
                 if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
                     // Manager; do nothing (don't delete permission so they can restore if necessary).
                 } elseif (is_enrolled($coursecontext, $user->userid, null, true) && has_capability('moodle/course:manageactivities', $coursecontext, $user->userid)) {
-                    // Enrolled teacher; do nothing (don't delete permission so they can restore if necessary).
+                    // Teacher (enrolled) (active); do nothing (don't delete permission so they can restore if necessary).
                 } else {
-                    // Enrolled student or unenrolled user; delete permission.
+                    // Student (enrolled) or unenrolled user; delete permission.
                     try {
                         $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
                         $permission = $this->service->permissions->get($filerec->reference, $permissionid->id);
