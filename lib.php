@@ -1613,17 +1613,103 @@ class repository_googledrive extends repository {
      */
     private function role_assigned($event) {
         global $DB;
+        $contextlevel = $event->contextlevel;
         $userid = $event->relateduserid;
         $gmail = $this->get_google_authenticated_users_gmail($userid);
-        $courseid = $event->courseid;
-        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
-        $coursecontext = context_course::instance($courseid);
-        $coursemodinfo = get_fast_modinfo($courseid, -1);
-        $cms = $coursemodinfo->get_cms();
         $insertcalls = array();
-        $deletecalls = array();
-        foreach ($cms as $cm) {
-            $cmid = $cm->id;
+        if ($contextlevel == 40) {
+            // Category role assigned.
+            $categoryid = $event->contextinstanceid;
+            $courses = $DB->get_records('course', array('category' => $categoryid), '', 'id, visible');
+            foreach ($courses as $course) {
+                $courseid = $course->id;
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
+                $coursemodinfo = get_fast_modinfo($courseid, -1);
+                $cms = $coursemodinfo->get_cms();
+                foreach ($cms as $cm) {
+                    $cmid = $cm->id;
+                    $cmcontext = context_module::instance($cmid);
+                    $fileids = $this->get_fileids($cmid);
+                    if ($fileids) {
+                        foreach ($fileids as $fileid) {
+                            if (has_capability('moodle/course:view', $coursecontext, $userid)) {
+                                // Manager; insert writer permission.
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $gmail;
+                                $call->role = 'writer';
+                                $insertcalls[] = $call;
+                                if (count($insertcalls) == 1000) {
+                                    $this->batch_insert_permissions($insertcalls);
+                                    $insertcalls = array();
+                                }
+                            } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
+                                // Teacher (enrolled) (active); insert writer permission.
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $gmail;
+                                $call->role = 'writer';
+                                $insertcalls[] = $call;
+                                if (count($insertcalls) == 1000) {
+                                    $this->batch_insert_permissions($insertcalls);
+                                    $insertcalls = array();
+                                }
+                            } elseif (is_enrolled($coursecontext, $userid, null, true)) {
+                                // Student (enrolled) (active); do nothing (user_enrolment_created handles reader permission).
+                            } else {
+                                // Unenrolled user; do nothing (user enrolment would not have changed during this event).
+                            }
+                        }
+                    }
+                }
+            }
+        } elseif ($contextlevel == 50) {
+            // Course role assigned.
+            $courseid = $event->courseid;
+            $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+            $coursecontext = context_course::instance($courseid);
+            $coursemodinfo = get_fast_modinfo($courseid, -1);
+            $cms = $coursemodinfo->get_cms();
+            foreach ($cms as $cm) {
+                $cmid = $cm->id;
+                $cmcontext = context_module::instance($cmid);
+                $fileids = $this->get_fileids($cmid);
+                if ($fileids) {
+                    foreach ($fileids as $fileid) {
+                        if (has_capability('moodle/course:view', $coursecontext, $userid)) {
+                            // Manager; insert writer permission.
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $call->role = 'writer';
+                            $insertcalls[] = $call;
+                            if (count($insertcalls) == 1000) {
+                                $this->batch_insert_permissions($insertcalls);
+                                $insertcalls = array();
+                            }
+                        } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
+                            // Teacher (enrolled) (active); insert writer permission.
+                            $call = new stdClass();
+                            $call->fileid = $fileid;
+                            $call->gmail = $gmail;
+                            $call->role = 'writer';
+                            $insertcalls[] = $call;
+                            if (count($insertcalls) == 1000) {
+                                $this->batch_insert_permissions($insertcalls);
+                                $insertcalls = array();
+                            }
+                        } elseif (is_enrolled($coursecontext, $userid, null, true)) {
+                            // Student (enrolled) (active); do nothing (user_enrolment_created handles reader permission).
+                        } else {
+                            // Unenrolled user; do nothing (user enrolment would not have changed during this event).
+                        }
+                    }
+                }
+            }
+        } else if ($contextlevel == 70) {
+            // Course module role assigned.
+            $cmid = $event->contextinstanceid;
             $cmcontext = context_module::instance($cmid);
             $fileids = $this->get_fileids($cmid);
             if ($fileids) {
@@ -1640,7 +1726,7 @@ class repository_googledrive extends repository {
                             $insertcalls = array();
                         }
                     } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
-                        // Enrolled teacher; insert writer permission.
+                        // Teacher (enrolled) (active); insert writer permission.
                         $call = new stdClass();
                         $call->fileid = $fileid;
                         $call->gmail = $gmail;
@@ -1651,21 +1737,18 @@ class repository_googledrive extends repository {
                             $insertcalls = array();
                         }
                     } elseif (is_enrolled($coursecontext, $userid, null, true)) {
-                        // Enrolled student; do nothing (user_enrolment_created handles reader permission).
+                        // Student (enrolled) (active); do nothing (user_enrolment_created handles reader permission).
                     } else {
                         // Unenrolled user; do nothing (user enrolment would not have changed during this event).
                     }
                 }
             }
+            
         }
 
         // Call any remaining batch requests.
         if (count($insertcalls) > 0) {
             $this->batch_insert_permissions($insertcalls);
-        }
-
-        if (count($deletecalls) > 0) {
-            $this->batch_delete_permissions($deletecalls);
         }
     }
 
@@ -1677,31 +1760,121 @@ class repository_googledrive extends repository {
      */
     private function role_unassigned($event) {
         global $DB;
+        $contextlevel = $event->contextlevel;
         $userid = $event->relateduserid;
         $gmail = $this->get_google_authenticated_users_gmail($userid);
-        $courseid = $event->courseid;
-        $course = $DB->get_record('course', array('id' => $courseid), 'visible');
-        $coursecontext = context_course::instance($courseid);
-        $coursemodinfo = get_fast_modinfo($courseid, -1);
-        $cms = $coursemodinfo->get_cms();
-        $deletecalls = array();
         $patchcalls = array();
-        foreach ($cms as $cm) {
-            $cmid = $cm->id;
-            $cmcontext = context_module::instance($cmid, IGNORE_MISSING);
-            $fileids = $this->get_fileids($cmid);
-            if ($fileids && $cmcontext) {
-                foreach ($fileids as $fileid) {
-                    if (has_capability('moodle/course:view', $coursecontext, $userid)) {
-                        // Manager; do nothing.
-                    } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
-                        // Enrolled teacher; do nothing.
-                    } elseif (is_enrolled($coursecontext, $userid, null, true)) {
-                        // Enrolled student; continue checks.
-                        if ($course->visible == 1) {
-                            // Course is visible; continue checks.
-                            if ($cm->visible == 1) {
-                                // Course module is visible, continue checks.
+        $deletecalls = array();
+        if ($contextlevel == 40) {
+            // Category role unassigned.
+            $categoryid = $event->contextinstanceid;
+            $courses = $DB->get_records('course', array('category' => $categoryid), '', 'id, visible');
+            foreach ($courses as $course) {
+                $courseid = $course->id;
+                $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+                $coursecontext = context_course::instance($courseid);
+                $coursemodinfo = get_fast_modinfo($courseid, -1);
+                $cms = $coursemodinfo->get_cms();
+                foreach ($cms as $cm) {
+                    $cmid = $cm->id;
+                    $cmcontext = context_module::instance($cmid);
+                    $fileids = $this->get_fileids($cmid);
+                    if ($fileids) {
+                        foreach ($fileids as $fileid) {
+                            if (has_capability('moodle/course:view', $coursecontext, $userid)) {
+                                // Manager; do nothing.
+                            } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
+                                // Teacher (enrolled) (active); do nothing.
+                            } elseif (is_enrolled($coursecontext, $userid, null, true)) {
+                                // Student (enrolled) (active); continue checks.
+                                if ($course->visible == 1) {
+                                    // Course is visible; continue checks.
+                                    rebuild_course_cache($courseid, true);
+                                    $modinfo = get_fast_modinfo($courseid, $userid);
+                                    $cminfo = $modinfo->get_cm($cmid);
+                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                    $secinfo = $modinfo->get_section_info($sectionnumber);
+                                    if ($cminfo->uservisible && $secinfo->available) {
+                                        // User can view and access course module and can access section; patch to reader permission.
+                                        try {
+                                            $call = new stdClass();
+                                            $call->fileid = $fileid;
+                                            $call->gmail = $gmail;
+                                            $call->role = 'reader';
+                                            $permissionid = $this->service->permissions->getIdForEmail($gmail);
+                                            $call->permissionid = $permissionid->id;
+                                            $patchcalls[] = $call;
+                                            if (count($patchcalls) == 1000) {
+                                                $this->batch_patch_permissions($patchcalls);
+                                                $patchcalls = array();
+                                            }
+                                        } catch (Exception $e) {
+                                            debugging($e);
+                                        }
+                                    } else {
+                                        // Course module or section not available; delete permission.
+                                        try {
+                                            $permissionid = $this->service->permissions->getIdForEmail($gmail);
+                                            $permission = $this->service->permissions->get($fileid, $permissionid->id);
+                                            if ($permission->role != 'owner') {
+                                                $call = new stdClass();
+                                                $call->fileid = $fileid;
+                                                $call->permissionid = $permissionid->id;
+                                                $deletecalls[] = $call;
+                                                if (count($deletecalls) == 1000) {
+                                                    $this->batch_delete_permissions($deletecalls);
+                                                    $deletecalls = array();
+                                                }
+                                            }
+                                        } catch (Exception $e) {
+                                            debugging($e);
+                                        }
+                                    }
+                                }
+                                // Course not visible; do nothing (course would not change here).
+                            }
+                            // Unenrolled user; delete permission.
+                            try {
+                                $permissionid = $this->service->permissions->getIdForEmail($gmail);
+                                $permission = $this->service->permissions->get($fileid, $permissionid->id);
+                                if ($permission->role != 'owner') {
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->permissionid = $permissionid->id;
+                                    $deletecalls[] = $call;
+                                    if (count($deletecalls) == 1000) {
+                                        $this->batch_delete_permissions($deletecalls);
+                                        $deletecalls = array();
+                                    }
+                                }
+                            } catch (Exception $e) {
+                                debugging($e);
+                            }
+                        }
+                    }
+                }
+            }
+        } elseif ($contextlevel == 50) {
+            // Course role assigned.
+            $courseid = $event->courseid;
+            $course = $DB->get_record('course', array('id' => $courseid), 'visible');
+            $coursecontext = context_course::instance($courseid);
+            $coursemodinfo = get_fast_modinfo($courseid, -1);
+            $cms = $coursemodinfo->get_cms();
+            foreach ($cms as $cm) {
+                $cmid = $cm->id;
+                $cmcontext = context_module::instance($cmid);
+                $fileids = $this->get_fileids($cmid);
+                if ($fileids) {
+                    foreach ($fileids as $fileid) {
+                        if (has_capability('moodle/course:view', $coursecontext, $userid)) {
+                            // Manager; do nothing.
+                        } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
+                            // Teacher (enrolled) (active); do nothing.
+                        } elseif (is_enrolled($coursecontext, $userid, null, true)) {
+                            // Student (enrolled) (active); continue checks.
+                            if ($course->visible == 1) {
+                                // Course is visible; continue checks.
                                 rebuild_course_cache($courseid, true);
                                 $modinfo = get_fast_modinfo($courseid, $userid);
                                 $cminfo = $modinfo->get_cm($cmid);
@@ -1725,7 +1898,7 @@ class repository_googledrive extends repository {
                                         debugging($e);
                                     }
                                 } else {
-                                    // Course module or section is not accessible; delete permissions;
+                                    // Course module or section not available; delete permission.
                                     try {
                                         $permissionid = $this->service->permissions->getIdForEmail($gmail);
                                         $permission = $this->service->permissions->get($fileid, $permissionid->id);
@@ -1743,8 +1916,52 @@ class repository_googledrive extends repository {
                                         debugging($e);
                                     }
                                 }
+                            }
+                            // Course not visible; do nothing (course would not change here).
+                        }
+                        // Unenrolled user; do nothing (enrolment would not change here).
+                    }
+                }
+            }
+        } else if ($contextlevel == 70) {
+            // Course module role assigned.
+            $cmid = $event->contextinstanceid;
+            $cmcontext = context_module::instance($cmid);
+            $fileids = $this->get_fileids($cmid);
+            if ($fileids) {
+                foreach ($fileids as $fileid) {
+                    if (has_capability('moodle/course:view', $coursecontext, $userid)) {
+                        // Manager; do nothing.
+                    } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
+                        // Teacher (enrolled) (active); do nothing.
+                    } elseif (is_enrolled($coursecontext, $userid, null, true)) {
+                        // Student (enrolled) (active); continue checks.
+                        if ($course->visible == 1) {
+                            // Course is visible; continue checks.
+                            rebuild_course_cache($courseid, true);
+                            $modinfo = get_fast_modinfo($courseid, $userid);
+                            $cminfo = $modinfo->get_cm($cmid);
+                            $sectionnumber = $this->get_cm_sectionnum($cmid);
+                            $secinfo = $modinfo->get_section_info($sectionnumber);
+                            if ($cminfo->uservisible && $secinfo->available) {
+                                // User can view and access course module and can access section; patch to reader permission.
+                                try {
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $call->role = 'reader';
+                                    $permissionid = $this->service->permissions->getIdForEmail($gmail);
+                                    $call->permissionid = $permissionid->id;
+                                    $patchcalls[] = $call;
+                                    if (count($patchcalls) == 1000) {
+                                        $this->batch_patch_permissions($patchcalls);
+                                        $patchcalls = array();
+                                    }
+                                } catch (Exception $e) {
+                                    debugging($e);
+                                }
                             } else {
-                                /// Course module is not visible; delete permissions;
+                                // Course module or section not available; delete permission.
                                 try {
                                     $permissionid = $this->service->permissions->getIdForEmail($gmail);
                                     $permission = $this->service->permissions->get($fileid, $permissionid->id);
@@ -1762,37 +1979,20 @@ class repository_googledrive extends repository {
                                     debugging($e);
                                 }
                             }
-                        } else {
-                            // Course is not visible; delete permission.
-                            try {
-                                $permissionid = $this->service->permissions->getIdForEmail($gmail);
-                                $permission = $this->service->permissions->get($fileid, $permissionid->id);
-                                if ($permission->role != 'owner') {
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->permissionid = $permissionid->id;
-                                    $deletecalls[] = $call;
-                                    if (count($deletecalls) == 1000) {
-                                        $this->batch_delete_permissions($deletecalls);
-                                        $deletecalls = array();
-                                    }
-                                }
-                            } catch (Exception $e) {
-                                debugging($e);
-                            }
                         }
-                    } else {
-                        // Unenrolled user; do nothing (user enrolment would not have changed during this event).
+                        // Course not visible; do nothing (course would not change here).
                     }
+                    // Unenrolled user; do nothing (enrolment would not change here).
                 }
             }
+    
         }
-
+    
         // Call any remaining batch requests.
         if (count($patchcalls) > 0) {
             $this->batch_patch_permissions($patchcalls);
         }
-        
+
         if (count($deletecalls) > 0) {
             $this->batch_delete_permissions($deletecalls);
         }
