@@ -2242,7 +2242,7 @@ class repository_googledrive extends repository {
                         if (has_capability('moodle/course:view', $coursecontext, $userid)) {
                             // Manager; do nothing.
                         } elseif (is_enrolled($coursecontext, $userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $userid)) {
-                            // Enrolled teacher; insert writer permisson.
+                            // Teacher (enrolled) (active); insert writer permisson.
                             $call = new stdClass();
                             $call->fileid = $fileid;
                             $call->gmail = $gmail;
@@ -2253,36 +2253,29 @@ class repository_googledrive extends repository {
                                 $insertcalls = array();
                             }
                         } elseif (is_enrolled($coursecontext, $userid, null, true)) {
-                            // Enrolled student; continue checks for reader permissions.
+                            // Student (enrolled) (active); continue checks.
                             if ($course->visible == 1) {
                                 // Course is visible, continue checks.
-                                if ($cm->visible == 1) {
-                                    // Course module is visible, continue checks.
-                                    rebuild_course_cache($courseid, true);
-                                    $modinfo = get_fast_modinfo($courseid, $userid);
-                                    $cminfo = $modinfo->get_cm($cmid);
-                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                    $secinfo = $modinfo->get_section_info($sectionnumber);
-                                    if ($cminfo->uservisible && $secinfo->available) {
-                                        // User can view and access course module and can access section; insert reader permission.
-                                        $call = new stdClass();
-                                        $call->fileid = $fileid;
-                                        $call->gmail = $gmail;
-                                        $call->role = 'reader';
-                                        $insertcalls[] = $call;
-                                        if (count($insertcalls) == 1000) {
-                                            $this->batch_insert_permissions($insertcalls);
-                                            $insertcalls = array();
-                                        }
-                                    } else {
-                                        // User cannot access course module, do nothing (course module availability won't change here).
+                                rebuild_course_cache($courseid, true);
+                                $modinfo = get_fast_modinfo($courseid, $userid);
+                                $cminfo = $modinfo->get_cm($cmid);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available) {
+                                    // User can view and access course module and can access section; insert reader permission.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $gmail;
+                                    $call->role = 'reader';
+                                    $insertcalls[] = $call;
+                                    if (count($insertcalls) == 1000) {
+                                        $this->batch_insert_permissions($insertcalls);
+                                        $insertcalls = array();
                                     }
-                                } else {
-                                    // Course module not visible; do nothing (course module visibility won't change here).
                                 }
-                            } else {
-                                // Course not visible, do nothing.
+                                // Course module not visible or avaiable; do nothing (module would not change here).
                             }
+                            // Course not visible, do nothing (course would not change here).
                         } else {
                             // Unenrolled user; delete permission.
                             try {
@@ -2333,7 +2326,7 @@ class repository_googledrive extends repository {
             $filerecs = $DB->get_records('repository_gdrive_references', array('courseid' => $courseid), '', 'id, reference');
             if ($filerecs) {
                 foreach ($filerecs as $filerec) {
-                    if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
+                    if (has_capability('moodle/course:view', $coursecontext, $userid)) {
                         // Manager; do nothing.
                     } else {
                         // Unenrolled user; delete permission.
