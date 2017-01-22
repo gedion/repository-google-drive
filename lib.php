@@ -1076,11 +1076,14 @@ class repository_googledrive extends repository {
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
+
         $users = $this->get_google_authenticated_users($courseid);
         $sectionnumber = $event->other['sectionnum'];
         $cms = $this->get_section_course_modules($sectionnumber);
+
         $insertcalls = array();
         $deletecalls = array();
+
         foreach ($cms as $cm) {
             $cmid = $cm->id;
             $cmcontext = context_module::instance($cmid);
@@ -1091,50 +1094,29 @@ class repository_googledrive extends repository {
                         if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
                             // Manager; do nothing.
                         } elseif (is_enrolled($coursecontext, $user->userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $user->userid)) {
-                            // Enrolled teacher; do nothing.
+                            // Teacher (enrolled) (active); do nothing.
                         } elseif (is_enrolled($coursecontext, $user->userid, null, true)) {
-                            // Enrolled student; continue checks for reader permissions.
+                            // Student (enrolled) (active); continue checks.
                             if ($course->visible == 1) {
                                 // Course is visible, continue checks.
-                                if ($cm->visible == 1) {
-                                    // Course module is visible, continue checks.
-                                    rebuild_course_cache($courseid, true);
-                                    $modinfo = get_fast_modinfo($courseid, $user->userid);
-                                    $cminfo = $modinfo->get_cm($cmid);
-                                    $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                    $secinfo = $modinfo->get_section_info($sectionnumber);
-                                    if ($cminfo->uservisible && $secinfo->available) {
-                                        // User can view and access course module and can access section; insert reader permission.
-                                        $call = new stdClass();
-                                        $call->fileid = $fileid;
-                                        $call->gmail = $user->gmail;
-                                        $call->role = 'reader';
-                                        $insertcalls[] = $call;
-                                        if (count($insertcalls) == 1000) {
-                                            $this->batch_insert_permissions($insertcalls);
-                                            $insertcalls = array();
-                                        }
-                                    } else {
-                                        // User cannot access course module or section, delete permission.
-                                        try {
-                                            $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
-                                            $permission = $this->service->permissions->get($fileid, $permissionid->id);
-                                            if ($permission->role != 'owner') {
-                                                $call = new stdClass();
-                                                $call->fileid = $fileid;
-                                                $call->permissionid = $permissionid->id;
-                                                $deletecalls[] = $call;
-                                                if (count($deletecalls) == 1000) {
-                                                    $this->batch_delete_permissions($deletecalls);
-                                                    $deletecalls = array();
-                                                }
-                                            }
-                                        } catch (Exception $e) {
-                                            debugging($e);
-                                        }
+                                rebuild_course_cache($courseid, true);
+                                $modinfo = get_fast_modinfo($courseid, $user->userid);
+                                $cminfo = $modinfo->get_cm($cmid);
+                                $sectionnumber = $this->get_cm_sectionnum($cmid);
+                                $secinfo = $modinfo->get_section_info($sectionnumber);
+                                if ($cminfo->uservisible && $secinfo->available) {
+                                    // Course module and section are visible and available; insert reader permission.
+                                    $call = new stdClass();
+                                    $call->fileid = $fileid;
+                                    $call->gmail = $user->gmail;
+                                    $call->role = 'reader';
+                                    $insertcalls[] = $call;
+                                    if (count($insertcalls) == 1000) {
+                                        $this->batch_insert_permissions($insertcalls);
+                                        $insertcalls = array();
                                     }
                                 } else {
-                                    // Course module not visible, delete permission.
+                                    // User cannot access course module or section, delete permission.
                                     try {
                                         $permissionid = $this->service->permissions->getIdForEmail($user->gmail);
                                         $permission = $this->service->permissions->get($fileid, $permissionid->id);
@@ -1151,13 +1133,11 @@ class repository_googledrive extends repository {
                                     } catch (Exception $e) {
                                         debugging($e);
                                     }
-                                }
-                            } else {
-                                // Course is not visible; do nothing (course visibility would not have changed during this event).
+                                }   
                             }
-                        } else {
-                            // Unenrolled user; do nothing (user enrolment would not have changed during this event).
+                            // Course is not visible; do nothing (course visibility would not have changed during this event).
                         }
+                        // Unenrolled user; do nothing (user enrolment would not have changed during this event).
                     }
                 }
             }
