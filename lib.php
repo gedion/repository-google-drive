@@ -1567,6 +1567,7 @@ class repository_googledrive extends repository {
         $courseid = $event->courseid;
         $course = $DB->get_record('course', array('id' => $courseid), 'visible');
         $coursecontext = context_course::instance($courseid);
+
         $restoreditem = $event->get_record_snapshot('tool_recyclebin_course', $objectid);
         $section = $restoreditem->section;
         $module = $restoreditem->module;
@@ -1580,47 +1581,44 @@ class repository_googledrive extends repository {
         $cm = $DB->get_record_sql($sql, array('courseid' => $courseid, 'module' => $module, 'section' => $section));
         $cmid = $cm->id;
         $cmcontext = context_module::instance($cmid);
+
         $users = $this->get_google_authenticated_users($courseid);
         $fileids = $this->get_fileids($cmid);
         $insertcalls = array();
+
         if ($fileids) {
             foreach ($fileids as $fileid) {
                 foreach ($users as $user) {
                     if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
                         // Manager; do nothing (permission should already exist).
                     } elseif (is_enrolled($coursecontext, $user->userid, null, true) && has_capability('moodle/course:manageactivities', $cmcontext, $user->userid)) {
-                        // Enrolled teacher; do nothing (permission should already exist).
+                        // Teacher (enrolled) (active); do nothing (permission should already exist).
                     } elseif (is_enrolled($coursecontext, $user->userid, null, true)) {
-                        // Enrolled student; continue checks for reader permission.
+                        // Student (enrolled) (active); continue checks for reader permission.
                         if ($course->visible == 1) {
                             // Course is visible, continue checks.
-                            if ($cm->visible == 1) {
-                                // Course module is visible, continue checks.
-                                rebuild_course_cache($courseid, true);
-                                $modinfo = get_fast_modinfo($courseid, $user->userid);
-                                $cminfo = $modinfo->get_cm($cmid);
-                                $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                $secinfo = $modinfo->get_section_info($sectionnumber);
-                                if ($cminfo->uservisible && $secinfo->available) {
-                                    // Course module is visible and accessible, section is accessible; insert reader permission.
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->gmail = $user->gmail;
-                                    $call->role = 'reader';
-                                    $insertcalls[] = $call;
-                                    if (count($insertcalls) == 1000) {
-                                        $this->batch_insert_permissions($insertcalls);
-                                        $insertcalls = array();
-                                    }
+                            rebuild_course_cache($courseid, true);
+                            $modinfo = get_fast_modinfo($courseid, $user->userid);
+                            $cminfo = $modinfo->get_cm($cmid);
+                            $sectionnumber = $this->get_cm_sectionnum($cmid);
+                            $secinfo = $modinfo->get_section_info($sectionnumber);
+                            if ($cminfo->uservisible && $secinfo->available) {
+                                // Course module is visible and accessible, section is accessible; insert reader permission.
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $user->gmail;
+                                $call->role = 'reader';
+                                $insertcalls[] = $call;
+                                if (count($insertcalls) == 1000) {
+                                    $this->batch_insert_permissions($insertcalls);
+                                    $insertcalls = array();
                                 }
-                                // User cannot access course module or section, do nothing.
                             }
-                            // Course module not visible, do nothing.
+                            // Course module or section not visible or available; do nothing.
                         }
                         // Course not visible, do nothing.
-                    } else {
-                        // User is not enrolled; do nothing.
-                    }
+                    } 
+                    // User is not enrolled; do nothing.
                 }
 
                 // Store cmid and reference(s).
