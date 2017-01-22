@@ -2161,7 +2161,7 @@ class repository_googledrive extends repository {
 
     /**
      * Insert Google Drive permissions when user is enroled in course.
-     * Don't worry about reader/writer here - role_assigned handles after user enroled.
+     * Don't worry about reader/writer here - role_assigned handles after user enrolled.
      *
      * @param unknown $event
      */
@@ -2181,31 +2181,28 @@ class repository_googledrive extends repository {
                 $cmcontext = context_module::instance($cmid);
                 $fileids = $this->get_fileids($cmid);
                 if ($fileids) {
-                    foreach ($fileids as $fileid) {
+                    foreach ($fileids as $fileid) {                        
                         if ($course->visible == 1) {
                             // Course is visible, continue checks.
-                            if ($cm->visible == 1) {
-                                // Course module is visible, continue checks.
-                                rebuild_course_cache($courseid, true);
-                                $modinfo = get_fast_modinfo($courseid, $userid);
-                                $cminfo = $modinfo->get_cm($cmid);
-                                $sectionnumber = $this->get_cm_sectionnum($cmid);
-                                $secinfo = $modinfo->get_section_info($sectionnumber);
-                                if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
-                                    // User can view course module, section, and is enrolled in course.
-                                    $call = new stdClass();
-                                    $call->fileid = $fileid;
-                                    $call->gmail = $gmail;
-                                    $call->role = 'reader';
-                                    $insertcalls[] = $call;
-                                    if (count($insertcalls) == 1000) {
-                                        $this->batch_insert_permissions($insertcalls);
-                                        $insertcalls = array();
-                                    }
+                            rebuild_course_cache($courseid, true);
+                            $modinfo = get_fast_modinfo($courseid, $userid);
+                            $cminfo = $modinfo->get_cm($cmid);
+                            $sectionnumber = $this->get_cm_sectionnum($cmid);
+                            $secinfo = $modinfo->get_section_info($sectionnumber);
+                            if ($cminfo->uservisible && $secinfo->available && is_enrolled($coursecontext, $userid, '', true)) {
+                                // Course module and section are visible and available.
+                                // Insert reader permission.
+                                $call = new stdClass();
+                                $call->fileid = $fileid;
+                                $call->gmail = $gmail;
+                                $call->role = 'reader';
+                                $insertcalls[] = $call;
+                                if (count($insertcalls) == 1000) {
+                                    $this->batch_insert_permissions($insertcalls);
+                                    $insertcalls = array();
                                 }
-                                // Course module is not accessible, do nothing.
                             }
-                            // Course module is not visible, do nothing.
+                            // Course module is not visible or available, do nothing.
                         }
                         // Course is not visible, do nothing.
                     }
@@ -2336,7 +2333,10 @@ class repository_googledrive extends repository {
             $filerecs = $DB->get_records('repository_gdrive_references', array('courseid' => $courseid), '', 'id, reference');
             if ($filerecs) {
                 foreach ($filerecs as $filerec) {
-                    if (!is_enrolled($coursecontext, $userid, null, true)) {
+                    if (has_capability('moodle/course:view', $coursecontext, $user->userid)) {
+                        // Manager; do nothing.
+                    } else {
+                        // Unenrolled user; delete permission.
                         try {
                             $permissionid = $this->service->permissions->getIdForEmail($gmail);
                             $permission = $this->service->permissions->get($filerec->reference, $permissionid->id);
