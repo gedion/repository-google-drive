@@ -18,6 +18,8 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/repository/lib.php');
 require_once($CFG->libdir . '/google/lib.php');
+require_once($CFG->dirroot . '/repository/googledrive/preferences_form.php');
+require_once($CFG->dirroot . '/repository/googledocs/lib.php');
 
 /**
  * Google Drive Plugin
@@ -523,6 +525,7 @@ class repository_googledrive extends repository {
      * @param array $options additional options affecting the file serving
      */
     public function send_file($storedfile, $lifetime=null , $filter=0, $forcedownload=false, array $options = null) {
+        global $DB, $OUTPUT;
         $id = $storedfile->get_reference();
         $token = json_decode($this->get_access_token());
         header('Authorization: Bearer ' . $token->access_token);
@@ -532,13 +535,21 @@ class repository_googledrive extends repository {
             header('Location: ' . $url);
             die;
         } else {
-            $file = $this->service->files->get($id);
-            $type = str_replace('application/vnd.google-apps.', '', $file['mimeType']);
-            if (in_array($type, self::$googlelivedrivetypes)) {
-                redirect($file->alternateLink);
+            $form = new edit_repository_googledrive_form();
+            list($redirecturl, $status, $email) = $form->get_redirect_url_and_connection_status();
+            if ($status != 'connected') {
+                $errormsg = "<strong>" . get_string('pleaseconnectgooglelink', 'repository_googledrive') ."</strong>";
+                echo $OUTPUT->notification($errormsg);
+                echo $redirecturl;
             } else {
-                header("Location: " . $file->downloadurl . '&access_token='. $token->access_token);
-                die;
+                $file = $this->service->files->get($id);
+                $type = str_replace('application/vnd.google-apps.', '', $file['mimeType']);
+                if (in_array($type, self::$googlelivedrivetypes)) {
+                    redirect($file->alternateLink);
+                } else {
+                    header("Location: " . $file->downloadurl . '&access_token='. $token->access_token);
+                    die;
+                }
             }
         }
     }

@@ -75,7 +75,7 @@ class edit_repository_googledrive_form extends moodleform {
      * a login to google url or a revoke token url) and
      * a login status
      */
-    private function get_redirect_url_and_connection_status() {
+    public function get_redirect_url_and_connection_status() {
         global $DB, $USER;
 
         $context = context_user::instance($USER->id);
