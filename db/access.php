@@ -25,7 +25,6 @@
 defined('MOODLE_INTERNAL') || die();
 
 $capabilities = array(
-
     'repository/googledrive:view' => array(
         'captype' => 'read',
         'contextlevel' => CONTEXT_MODULE,

@@ -31,7 +31,6 @@ use Behat\Mink\Exception\SkippedException as SkippedException;
  */
 class behat_googledrive extends behat_base
 {
-
     /**
      * Used to determine if we need to login to Google Drive again.
      *

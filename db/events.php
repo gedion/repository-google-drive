@@ -21,7 +21,27 @@ $callback = 'repository_googledrive_observer::manage_resources';
 $observers = array (
 
     array (
+        'eventname'   => '\core\event\course_category_updated',
+        'callback'    => $callback
+    ),
+    array (
         'eventname'   => '\core\event\course_updated',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\course_restored',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\course_content_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\tool_recyclebin\event\course_bin_item_restored',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\course_section_updated',
         'callback'    => $callback
     ),
     array (
@@ -33,7 +53,7 @@ $observers = array (
         'callback'    => $callback
     ),
     array (
-        'eventname'   => '\core\event\course_module_delted',
+        'eventname'   => '\core\event\course_module_deleted',
         'callback'    => $callback
     ),
     array (
@@ -43,6 +63,49 @@ $observers = array (
     array (
         'eventname'   => '\core\event\role_unassigned',
         'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\role_capabilities_updated',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\group_member_added',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\group_member_removed',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\grouping_group_assigned',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\grouping_group_unassigned',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_enrolment_created',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_enrolment_updated',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_enrolment_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\core\event\user_deleted',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\repository_googledrive\event\repository_gdrive_tokens_created',
+        'callback'    => $callback
+    ),
+    array (
+        'eventname'   => '\repository_googledrive\event\repository_gdrive_tokens_deleted',
+        'callback'    => $callback
     )
-
 );
